@@ -1,0 +1,174 @@
+{% extends 'core/base.html' %}
+{% load currency_filters %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="mb-0"><i class="bi bi-people"></i> Gestión de Clientes</h1>
+            <p class="text-muted">Administra tu cartera de clientes</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'cliente_crear' %}" class="btn btn-primary">
+                <i class="bi bi-person-plus"></i> Nuevo Cliente
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i> Lista de Clientes
+                        <span class="badge bg-primary ms-2">{{ clientes.count }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>RUT/DNI</th>
+                                    <th>Email</th>
+                                    <th>Teléfono</th>
+                                    <th>Facturas Vencidas</th>
+                                    <th>Total Deuda</th>
+                                    <th>Registro</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cliente in clientes %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                                 style="width: 40px; height: 40px; font-size: 1.2rem;">
+                                                {{ cliente.nombre|slice:":1"|upper }}
+                                            </div>
+                                            <div>
+                                                <strong>{{ cliente.nombre }}</strong>
+                                                {% if cliente.notas %}
+                                                <br><small class="text-muted">{{ cliente.notas|truncatewords:8 }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if cliente.rut %}
+                                            <span class="badge bg-info">{{ cliente.rut|formatear_rut }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="mailto:{{ cliente.email }}">
+                                            <i class="bi bi-envelope"></i> {{ cliente.email }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if cliente.telefono %}
+                                            <i class="bi bi-telephone"></i> {{ cliente.telefono }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cliente.facturas_vencidas > 0 %}
+                                            <span class="badge badge-vencida">
+                                                {{ cliente.facturas_vencidas }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cliente.total_deuda > 0 %}
+                                            <strong class="text-danger">{{ cliente.total_deuda|currency:"CLP" }}</strong>
+                                        {% else %}
+                                            <span class="text-success">{{ 0|currency:"CLP" }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ cliente.fecha_registro|date:"d/m/Y" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'cliente_detalle' cliente.pk %}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Ver detalle">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                                        <p class="text-muted mt-3 mb-0">No hay clientes registrados</p>
+                                        <a href="{% url 'cliente_crear' %}" class="btn btn-primary mt-3">
+                                            <i class="bi bi-person-plus"></i> Crear Primer Cliente
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen estadístico -->
+    {% if clientes %}
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Clientes con Deuda</h6>
+                    <h3 class="mb-0">
+                        {% with deudores=clientes|length %}
+                        {% for c in clientes %}
+                            {% if c.total_deuda > 0 %}
+                                {{ forloop.counter }}
+                            {% endif %}
+                        {% endfor %}
+                        {% endwith %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Clientes</h6>
+                    <h3 class="mb-0">{{ clientes.count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Deuda Total</h6>
+                    <h3 class="mb-0 text-danger">
+                        {% with total=0 %}
+                            {% for c in clientes %}
+                                {% if forloop.first %}
+                                    {{ c.total_deuda|currency:"CLP" }}
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
