@@ -15,9 +15,11 @@ cd main-facto-pro
 
 ## Paso 3: Crear Entorno Virtual
 ```bash
-mkvirtualenv --python=/usr/bin/python3.10 facto-pro
-pip install -r requirements-minimal.txt
+mkvirtualenv --python=/usr/bin/python3.10 factopro
+pip install -r requirements-pythonanywhere.txt
 ```
+
+**Importante:** El virtualenv debe llamarse `factopro` (sin guión).
 
 ## Paso 4: Configurar Base de Datos
 ```bash
