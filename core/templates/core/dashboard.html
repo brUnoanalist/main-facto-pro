@@ -1,0 +1,192 @@
+{% extends 'core/base.html' %}
+{% load currency_filters %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard</h1>
+            <p class="text-muted">Resumen general del sistema</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'exportar_pdf' %}" class="btn btn-danger me-2">
+                <i class="bi bi-file-pdf"></i> Exportar PDF
+            </a>
+            <a href="{% url 'exportar_excel' %}" class="btn btn-success">
+                <i class="bi bi-file-excel"></i> Exportar Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Tarjetas de estadísticas -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card primary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Clientes</h6>
+                        <h2 class="mb-0">{{ total_clientes }}</h2>
+                    </div>
+                    <i class="bi bi-people" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stat-card warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Facturas Pendientes</h6>
+                        <h2 class="mb-0">{{ total_facturas }}</h2>
+                    </div>
+                    <i class="bi bi-file-earmark-text" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stat-card danger">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Facturas Vencidas</h6>
+                        <h2 class="mb-0 text-danger">{{ facturas_vencidas }}</h2>
+                    </div>
+                    <i class="bi bi-exclamation-triangle" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stat-card success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Pendiente</h6>
+                        <h2 class="mb-0 text-success">{{ total_pendiente|currency:"CLP" }}</h2>
+                    </div>
+                    <i class="bi bi-cash-stack" style="font-size: 3rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    {% if facturas_vencidas > 0 %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="alert alert-danger alert-custom" style="border-left-color: var(--danger-color);">
+                <h5><i class="bi bi-exclamation-circle"></i> ¡Atención!</h5>
+                <p class="mb-0">Tienes <strong>{{ facturas_vencidas }}</strong> facturas vencidas que requieren seguimiento inmediato.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if facturas_proximas > 0 %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="alert alert-warning alert-custom" style="border-left-color: var(--warning-color);">
+                <h5><i class="bi bi-clock-history"></i> Recordatorio</h5>
+                <p class="mb-0"><strong>{{ facturas_proximas }}</strong> facturas próximas a vencer en los próximos 7 días.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Últimas facturas -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Últimas Facturas</h5>
+                        <a href="{% url 'facturas_list' %}" class="btn btn-sm btn-outline-primary">
+                            Ver todas <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>N° Factura</th>
+                                    <th>Cliente</th>
+                                    <th>Monto</th>
+                                    <th>Vencimiento</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for factura in ultimas_facturas %}
+                                <tr>
+                                    <td><strong>{{ factura.numero_factura }}</strong></td>
+                                    <td>
+                                        <a href="{% url 'cliente_detalle' factura.cliente.pk %}">
+                                            {{ factura.cliente.nombre }}
+                                        </a>
+                                    </td>
+                                    <td><strong>{{ factura.monto_formateado }}</strong></td>
+                                    <td>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</td>
+                                    <td>
+                                        {% if factura.estado == 'vencida' %}
+                                            <span class="badge badge-vencida">Vencida</span>
+                                        {% elif factura.estado == 'pendiente' %}
+                                            <span class="badge badge-pendiente">Pendiente</span>
+                                        {% else %}
+                                            <span class="badge badge-pagada">Pagada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if factura.estado != 'pagada' %}
+                                        <a href="{% url 'enviar_recordatorio' factura.pk %}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           title="Enviar recordatorio">
+                                            <i class="bi bi-envelope"></i>
+                                        </a>
+                                        <a href="{% url 'factura_pagar' factura.pk %}" 
+                                           class="btn btn-sm btn-outline-success" 
+                                           title="Marcar como pagada">
+                                            <i class="bi bi-check-circle"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        No hay facturas registradas
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-body text-center py-4">
+                    <h5 class="mb-3">Acciones Rápidas</h5>
+                    <a href="{% url 'cliente_crear' %}" class="btn btn-primary me-2">
+                        <i class="bi bi-person-plus"></i> Nuevo Cliente
+                    </a>
+                    <a href="{% url 'factura_crear' %}" class="btn btn-primary me-2">
+                        <i class="bi bi-file-plus"></i> Nueva Factura
+                    </a>
+                    <a href="{% url 'configuracion' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-gear"></i> Configuración
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

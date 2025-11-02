@@ -1,0 +1,251 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Configuración</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <!-- Header -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h4 class="mb-0">
+                        <i class="bi bi-gear"></i> Configuración de Recordatorios
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted mb-0">
+                        Personaliza cómo y cuándo enviar recordatorios automáticos a tus clientes sobre facturas pendientes.
+                    </p>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <!-- Canales de envío -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-send"></i> Canales de Envío</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="{{ form.email_activo.id_for_label }}"
+                                           name="email_activo"
+                                           {% if form.email_activo.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="{{ form.email_activo.id_for_label }}">
+                                        <strong><i class="bi bi-envelope"></i> Envío por Email</strong>
+                                        <br><small class="text-muted">Enviar recordatorios automáticos por correo electrónico</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="{{ form.whatsapp_activo.id_for_label }}"
+                                           name="whatsapp_activo"
+                                           {% if form.whatsapp_activo.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="{{ form.whatsapp_activo.id_for_label }}">
+                                        <strong><i class="bi bi-whatsapp"></i> Envío por WhatsApp</strong>
+                                        <br><small class="text-muted">Enviar recordatorios por WhatsApp (requiere integración)</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i> 
+                            Los recordatorios se enviarán automáticamente según los días configurados antes del vencimiento.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Frecuencia -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Frecuencia de Recordatorios</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <label for="{{ form.dias_antes_vencimiento.id_for_label }}" class="form-label">
+                                    Enviar recordatorio X días antes del vencimiento
+                                </label>
+                                <div class="input-group" style="max-width: 300px;">
+                                    {{ form.dias_antes_vencimiento }}
+                                    <span class="input-group-text">días</span>
+                                </div>
+                                {% if form.dias_antes_vencimiento.errors %}
+                                    <div class="text-danger small mt-1">{{ form.dias_antes_vencimiento.errors }}</div>
+                                {% endif %}
+                                <small class="form-text text-muted mt-2 d-block">
+                                    Recomendado: 3 días antes del vencimiento
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="bg-light p-3 rounded">
+                                    <i class="bi bi-bell" style="font-size: 2rem; color: var(--primary-color);"></i>
+                                    <p class="mb-0 mt-2 small text-muted">Recordatorio automático activado</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plantilla Email -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-envelope-paper"></i> Plantilla de Email</h5>
+                    </div>
+                    <div class="card-body">
+                        <label for="{{ form.plantilla_email.id_for_label }}" class="form-label">
+                            Mensaje del recordatorio por email
+                        </label>
+                        {{ form.plantilla_email }}
+                        {% if form.plantilla_email.errors %}
+                            <div class="text-danger small mt-1">{{ form.plantilla_email.errors }}</div>
+                        {% endif %}
+                        
+                        <div class="alert alert-secondary mt-3">
+                            <strong>Variables disponibles:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><code>{cliente}</code> - Nombre del cliente</li>
+                                <li><code>{numero}</code> - Número de factura</li>
+                                <li><code>{monto}</code> - Monto de la factura</li>
+                                <li><code>{fecha}</code> - Fecha de vencimiento</li>
+                            </ul>
+                        </div>
+
+                        <div class="card mt-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="mb-2"><i class="bi bi-eye"></i> Vista previa:</h6>
+                                <div class="border rounded p-3 bg-white" style="white-space: pre-wrap;">Estimado Juan Pérez,
+
+Le recordamos que la factura 001-2024 por $150000 vence el 15/11/2024.
+
+Saludos.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plantilla WhatsApp -->
+                <div class="card shadow mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Plantilla de WhatsApp</h5>
+                    </div>
+                    <div class="card-body">
+                        <label for="{{ form.plantilla_whatsapp.id_for_label }}" class="form-label">
+                            Mensaje del recordatorio por WhatsApp
+                        </label>
+                        {{ form.plantilla_whatsapp }}
+                        {% if form.plantilla_whatsapp.errors %}
+                            <div class="text-danger small mt-1">{{ form.plantilla_whatsapp.errors }}</div>
+                        {% endif %}
+                        
+                        <div class="alert alert-warning mt-3">
+                            <i class="bi bi-exclamation-triangle"></i> 
+                            <strong>Nota:</strong> La integración con WhatsApp requiere configuración adicional. 
+                            Mantén los mensajes cortos y amigables.
+                        </div>
+
+                        <div class="card mt-3 bg-light">
+                            <div class="card-body">
+                                <h6 class="mb-2"><i class="bi bi-eye"></i> Vista previa:</h6>
+                                <div class="border rounded p-3 bg-white">
+                                    <div class="d-flex">
+                                        <div class="bg-success text-white rounded px-3 py-2" style="max-width: 80%;">
+                                            Hola Juan Pérez, recordatorio amistoso: factura 001-2024 por $150000 vence el 15/11/2024. ¡Gracias!
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Volver al Dashboard
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-save"></i> Guardar Configuración
+                    </button>
+                </div>
+            </form>
+
+            <!-- Ayuda adicional -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6><i class="bi bi-question-circle"></i> Ayuda</h6>
+                    <div class="accordion" id="accordionHelp">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help1">
+                                    ¿Cómo funcionan los recordatorios automáticos?
+                                </button>
+                            </h2>
+                            <div id="help1" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                                <div class="accordion-body">
+                                    El sistema enviará automáticamente recordatorios a tus clientes según los días configurados 
+                                    antes del vencimiento. Por ejemplo, si configuras 3 días, el recordatorio se enviará 3 días 
+                                    antes de que venza la factura.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help2">
+                                    ¿Cómo configurar el envío de emails?
+                                </button>
+                            </h2>
+                            <div id="help2" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                                <div class="accordion-body">
+                                    Debes configurar tu servidor SMTP en el archivo settings.py. Para Gmail, necesitas crear 
+                                    una "contraseña de aplicación" en tu cuenta de Google. Luego, actualiza EMAIL_HOST_USER 
+                                    y EMAIL_HOST_PASSWORD en la configuración.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help3">
+                                    ¿Puedo personalizar los mensajes?
+                                </button>
+                            </h2>
+                            <div id="help3" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+                                <div class="accordion-body">
+                                    Sí, puedes editar las plantillas de email y WhatsApp. Usa las variables disponibles 
+                                    (cliente, numero, monto, fecha) para personalizar automáticamente cada mensaje con 
+                                    la información de la factura correspondiente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

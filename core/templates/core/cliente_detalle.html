@@ -1,0 +1,224 @@
+{% extends 'core/base.html' %}
+{% load currency_filters %}
+
+{% block title %}{{ cliente.nombre }} - Detalle{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'clientes_list' %}">Clientes</a></li>
+                    <li class="breadcrumb-item active">{{ cliente.nombre }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Información del Cliente -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style="width: 80px; height: 80px; font-size: 2.5rem;">
+                            {{ cliente.nombre|slice:":1"|upper }}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h2 class="mb-1">{{ cliente.nombre }}</h2>
+                                <a href="{% url 'cliente_editar' cliente.pk %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil-square"></i> Editar Cliente
+                                </a>
+                            </div>
+                            {% if cliente.rut %}
+                            <p class="mb-2">
+                                <span class="badge bg-info"><i class="bi bi-card-text"></i> {{ cliente.rut|formatear_rut }}</span>
+                            </p>
+                            {% endif %}
+                            <p class="text-muted mb-3">
+                                <i class="bi bi-calendar"></i> Cliente desde {{ cliente.fecha_registro|date:"d/m/Y" }}
+                            </p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2">
+                                        <i class="bi bi-envelope"></i>
+                                        <a href="mailto:{{ cliente.email }}">{{ cliente.email }}</a>
+                                    </p>
+                                    {% if cliente.telefono %}
+                                    <p class="mb-2">
+                                        <i class="bi bi-telephone"></i> {{ cliente.telefono }}
+                                    </p>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {% if cliente.notas %}
+                                    <p class="mb-0">
+                                        <strong>Notas:</strong><br>
+                                        <small class="text-muted">{{ cliente.notas }}</small>
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card stat-card danger mb-3">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Total Deuda</h6>
+                    <h2 class="mb-0 text-danger">{{ cliente.total_deuda|currency:"CLP" }}</h2>
+                </div>
+            </div>
+            <div class="card stat-card warning">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Facturas Vencidas</h6>
+                    <h2 class="mb-0 text-warning">{{ cliente.facturas_vencidas }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Facturas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-file-earmark-text"></i> Historial de Facturas
+                            <span class="badge bg-primary ms-2">{{ facturas.count }}</span>
+                        </h5>
+                        <a href="{% url 'factura_crear' %}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-circle"></i> Nueva Factura
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>N° Factura</th>
+                                    <th>Monto</th>
+                                    <th>Emisión</th>
+                                    <th>Vencimiento</th>
+                                    <th>Estado</th>
+                                    <th>Días</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for factura in facturas %}
+                                <tr class="{% if factura.estado == 'vencida' %}table-danger{% elif factura.proxima_vencer %}table-warning{% endif %}">
+                                    <td><strong>{{ factura.numero_factura }}</strong></td>
+                                    <td><strong>{{ factura.monto_formateado }}</strong></td>
+                                    <td>{{ factura.fecha_emision|date:"d/m/Y" }}</td>
+                                    <td>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</td>
+                                    <td>
+                                        {% if factura.estado == 'vencida' %}
+                                            <span class="badge badge-vencida">
+                                                <i class="bi bi-exclamation-triangle"></i> Vencida
+                                            </span>
+                                        {% elif factura.estado == 'pendiente' %}
+                                            <span class="badge badge-pendiente">Pendiente</span>
+                                        {% else %}
+                                            <span class="badge badge-pagada">
+                                                <i class="bi bi-check-circle"></i> Pagada
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if factura.dias_vencidos > 0 %}
+                                            <span class="text-danger">
+                                                <i class="bi bi-clock-history"></i> +{{ factura.dias_vencidos }} días
+                                            </span>
+                                        {% elif factura.estado == 'pagada' %}
+                                            <span class="text-muted">-</span>
+                                        {% else %}
+                                            <span class="text-success">Al día</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if factura.estado != 'pagada' %}
+                                            <a href="{% url 'enviar_recordatorio' factura.pk %}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Enviar recordatorio">
+                                                <i class="bi bi-envelope"></i>
+                                            </a>
+                                            <a href="{% url 'factura_pagar' factura.pk %}" 
+                                               class="btn btn-sm btn-outline-success" 
+                                               title="Marcar como pagada"
+                                               onclick="return confirm('¿Marcar como pagada?')">
+                                                <i class="bi bi-check-circle"></i>
+                                            </a>
+                                        {% else %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check2"></i> Pagada {{ factura.fecha_pago|date:"d/m/Y" }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                                        <p class="text-muted mt-3 mb-0">No hay facturas registradas para este cliente</p>
+                                        <a href="{% url 'factura_crear' %}" class="btn btn-primary mt-3">
+                                            <i class="bi bi-plus-circle"></i> Crear Primera Factura
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Recordatorios -->
+    {% if facturas %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Últimos Recordatorios Enviados
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for factura in facturas %}
+                        {% if factura.recordatorios.all %}
+                            {% for recordatorio in factura.recordatorios.all|slice:":3" %}
+                                <div class="d-flex align-items-center mb-2 pb-2 border-bottom">
+                                    <i class="bi bi-envelope me-2 text-primary"></i>
+                                    <div class="flex-grow-1">
+                                        <small>
+                                            <strong>{{ recordatorio.get_tipo_display }}</strong> 
+                                            enviado para factura <strong>{{ factura.numero_factura }}</strong>
+                                        </small>
+                                    </div>
+                                    <small class="text-muted">{{ recordatorio.fecha_envio|date:"d/m/Y H:i" }}</small>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if not facturas.0.recordatorios.all %}
+                        <p class="text-muted text-center mb-0">No se han enviado recordatorios aún</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
