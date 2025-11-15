@@ -207,21 +207,15 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="text-muted">Total Facturas</h6>
-                    <h3 class="mb-0">{{ facturas.count }}</h3>
+                    <h3 class="mb-0">{{ total_facturas }}</h3>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card text-center">
                 <div class="card-body">
-                    <h6 class="text-muted">Monto Total</h6>
-                    <h3 class="mb-0">
-                        {% for f in facturas %}
-                            {% if forloop.first %}
-                                {{ f.monto_formateado }}
-                            {% endif %}
-                        {% endfor %}
-                    </h3>
+                    <h6 class="text-muted">Pendientes</h6>
+                    <h3 class="mb-0 text-warning">{{ facturas_pendientes }}</h3>
                 </div>
             </div>
         </div>
@@ -229,16 +223,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="text-muted">Vencidas</h6>
-                    <h3 class="mb-0 text-danger">
-                        {% with vencidas=facturas|length %}
-                        0
-                        {% for f in facturas %}
-                            {% if f.estado == 'vencida' %}
-                                {% if forloop.first %}1{% else %}{{ forloop.counter }}{% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        {% endwith %}
-                    </h3>
+                    <h3 class="mb-0 text-danger">{{ facturas_vencidas }}</h3>
                 </div>
             </div>
         </div>
@@ -246,13 +231,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="text-muted">Pagadas</h6>
-                    <h3 class="mb-0 text-success">
-                        {% for f in facturas %}
-                            {% if f.estado == 'pagada' %}
-                                {{ forloop.counter }}
-                            {% endif %}
-                        {% endfor %}
-                    </h3>
+                    <h3 class="mb-0 text-success">{{ facturas_pagadas }}</h3>
                 </div>
             </div>
         </div>
