@@ -50,6 +50,7 @@ def dashboard(request):
     ).update(estado='vencida')
     
     facturas_vencidas = facturas.filter(estado='vencida')
+    facturas_pendientes = facturas.filter(estado='pendiente')
     facturas_proximas = facturas.filter(
         estado='pendiente',
         fecha_vencimiento__lte=timezone.now().date() + datetime.timedelta(days=7),
@@ -64,6 +65,7 @@ def dashboard(request):
         'total_clientes': clientes.count(),
         'total_facturas': facturas.count(),
         'facturas_vencidas': facturas_vencidas.count(),
+        'facturas_pendientes':facturas_pendientes.count(),
         'facturas_proximas': facturas_proximas.count(),
         'total_pendiente': total_pendiente,
         'ultimas_facturas': facturas[:10],
@@ -113,22 +115,35 @@ def cliente_editar(request, pk):
 
 @login_required
 def facturas_list(request):
-    facturas = Factura.objects.filter(usuario=request.user)
-    
+    todas_facturas = Factura.objects.filter(usuario=request.user)
+
+    # Calcular conteos para las tarjetas
+    total_facturas = todas_facturas.count()
+    facturas_vencidas = todas_facturas.filter(estado='vencida').count()
+    facturas_pagadas = todas_facturas.filter(estado='pagada').count()
+    facturas_pendientes = todas_facturas.filter(estado='pendiente').count()
+
+    # Filtrar según la selección del usuario
     filtro = request.GET.get('filtro', 'todas')
     if filtro == 'vencidas':
-        facturas = facturas.filter(estado='vencida')
+        facturas = todas_facturas.filter(estado='vencida')
     elif filtro == 'proximas':
-        facturas = facturas.filter(
+        facturas = todas_facturas.filter(
             estado='pendiente',
             fecha_vencimiento__lte=timezone.now().date() + datetime.timedelta(days=7)
         )
     elif filtro == 'pagadas':
-        facturas = facturas.filter(estado='pagada')
-    
+        facturas = todas_facturas.filter(estado='pagada')
+    else:
+        facturas = todas_facturas
+
     return render(request, 'core/facturas_list.html', {
         'facturas': facturas,
-        'filtro': filtro
+        'filtro': filtro,
+        'total_facturas': total_facturas,
+        'facturas_vencidas': facturas_vencidas,
+        'facturas_pagadas': facturas_pagadas,
+        'facturas_pendientes': facturas_pendientes,
     })
 
 @login_required
