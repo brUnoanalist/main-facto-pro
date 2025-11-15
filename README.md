@@ -73,48 +73,16 @@ python manage.py runserver
    - Formatea montos según la moneda configurada
    - Formatea RUTs chilenos automáticamente
 
-## Despliegue en Render (Gratis)
 
-### Opción 1: Usando render.yaml (Automático)
 
-1. Haz push de tu código a GitHub
-2. Ve a [Render.com](https://render.com) y crea una cuenta
-3. Click en "New +" → "Blueprint"
-4. Conecta tu repositorio de GitHub
-5. Render detectará automáticamente el `render.yaml` y configurará todo
-6. Click en "Apply" y espera a que se despliegue
 
-### Opción 2: Manual
 
-1. Ve a [Render.com](https://render.com) y crea una cuenta
-2. Crea una nueva PostgreSQL Database (gratis)
-3. Crea un nuevo Web Service
-   - Conecta tu repositorio de GitHub
-   - Build Command: `./build.sh`
-   - Start Command: `gunicorn morosidad_project.wsgi:application`
-4. Agrega variables de entorno:
-   - `DATABASE_URL`: (Render la configurará automáticamente)
-   - `SECRET_KEY`: (genera una nueva con Django)
-   - `DEBUG`: `False`
-   - `ALLOWED_HOSTS`: `tu-app.onrender.com`
-
-## Otras Opciones de Despliegue Gratuito
-
-### Railway
-- Hasta 500 horas/mes gratis
-- PostgreSQL incluido
-- Deploy automático desde GitHub
-- URL: https://railway.app
 
 ### PythonAnywhere
 - Plan gratuito disponible
 - 512 MB storage
 - URL: https://www.pythonanywhere.com
 
-### Fly.io
-- 3 VMs pequeñas gratis
-- PostgreSQL gratis
-- URL: https://fly.io
 
 ## Licencia
 
