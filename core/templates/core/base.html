@@ -21,13 +21,44 @@
         }
         
         .navbar {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,.1);
+            padding: 0.25rem 0;
+            min-height: 56px;
         }
-        
+
         .navbar-brand {
-            font-weight: bold;
-            font-size: 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: -0.3px;
+            color: white !important;
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+
+        .navbar-dark .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            margin: 0;
+            font-size: 0.875rem;
+            line-height: 1.2;
+        }
+
+        .navbar-dark .navbar-nav .nav-link i {
+            font-size: 0.875rem;
+            margin-right: 0.3rem;
+        }
+
+        .navbar-dark .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .container-fluid {
+            background: transparent;
+            padding-top: 1rem;
         }
         
         .card {

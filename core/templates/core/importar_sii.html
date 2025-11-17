@@ -1,0 +1,146 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Importar desde SII{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="mb-0"><i class="bi bi-cloud-upload"></i> Importar Facturas desde SII</h1>
+            <p class="text-muted">Carga facturas directamente desde archivos CSV del SII</p>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'facturas_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver a Facturas
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Instrucciones -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instrucciones</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="mb-0">
+                        <li class="mb-2">Descarga el archivo CSV desde el portal del SII</li>
+                        <li class="mb-2">Asegúrate de que el archivo contenga las columnas:
+                            <code>Número Documento</code>, <code>RUT Emisor</code>, <code>Razón Social</code>,
+                            <code>Fecha Emisión</code>, <code>Monto Total</code>
+                        </li>
+                        <li class="mb-2">El archivo debe estar en formato CSV con separador <code>;</code> (punto y coma)</li>
+                        <li class="mb-0">Selecciona el archivo y haz clic en "Importar Facturas"</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Formulario de importación -->
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Seleccionar Archivo CSV</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label for="csv_file" class="form-label">Archivo CSV del SII</label>
+                            <input type="file"
+                                   class="form-control form-control-lg"
+                                   id="csv_file"
+                                   name="csv_file"
+                                   accept=".csv"
+                                   required>
+                            <div class="form-text">
+                                Formatos aceptados: .csv (máximo 10 MB)
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-lightbulb"></i>
+                            <strong>Nota:</strong> El sistema creará automáticamente los clientes que no existan
+                            utilizando el RUT como identificador único.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-cloud-upload"></i> Importar Facturas
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Columnas esperadas -->
+            <div class="card mt-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-table"></i> Columnas Esperadas en el CSV</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Columna</th>
+                                    <th>Descripción</th>
+                                    <th>Requerida</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>Número Documento</code> o <code>Folio</code></td>
+                                    <td>Número único de la factura</td>
+                                    <td><span class="badge bg-danger">Sí</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>RUT Emisor</code></td>
+                                    <td>RUT del cliente que emitió la factura</td>
+                                    <td><span class="badge bg-danger">Sí</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Razón Social</code> o <code>Nombre</code></td>
+                                    <td>Nombre o razón social del cliente</td>
+                                    <td><span class="badge bg-danger">Sí</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Fecha Emisión</code></td>
+                                    <td>Fecha de emisión (formato: DD-MM-YYYY)</td>
+                                    <td><span class="badge bg-danger">Sí</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Fecha Vencimiento</code></td>
+                                    <td>Fecha de vencimiento (formato: DD-MM-YYYY)</td>
+                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Monto Neto</code> o <code>Neto</code></td>
+                                    <td>Monto neto de la factura</td>
+                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Monto IVA</code> o <code>IVA</code></td>
+                                    <td>Monto del IVA</td>
+                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Monto Total</code> o <code>Total</code></td>
+                                    <td>Monto total de la factura</td>
+                                    <td><span class="badge bg-danger">Sí</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-secondary mb-0 mt-3">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            Si no se proporciona la fecha de vencimiento, se calculará automáticamente
+                            como 30 días después de la fecha de emisión.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

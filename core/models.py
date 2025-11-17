@@ -34,6 +34,7 @@ class Factura(models.Model):
         ('pendiente', 'Pendiente'),
         ('pagada', 'Pagada'),
         ('vencida', 'Vencida'),
+        ('impaga', 'Impaga'),
     ]
 
     # Obtener opciones de moneda de forma dinámica
@@ -52,6 +53,9 @@ class Factura(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='facturas')
     numero_factura = models.CharField(max_length=50, unique=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
+    monto_neto = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monto_iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default='CLP')
     fecha_emision = models.DateField()
     fecha_vencimiento = models.DateField()
