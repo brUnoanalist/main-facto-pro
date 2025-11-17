@@ -398,6 +398,11 @@ def importar_sii(request):
                         cliente.nombre = razon_social
                         cliente.save()
 
+                    # Extraer campos adicionales del SII si existen
+                    estado_sii = row.get('EstadoSII') or row.get('Estado SII') or 'Importada'
+                    tipo_dte = row.get('TipoDTE') or row.get('Tipo DTE') or '33'
+                    monto_exento = parse_decimal(row.get('MontoExento') or row.get('Monto Exento') or '0')
+
                     # Crear o actualizar factura
                     factura, factura_created = Factura.objects.update_or_create(
                         numero_factura=numero_factura,
@@ -414,6 +419,20 @@ def importar_sii(request):
                             'descripcion': f'Importado desde SII - {razon_social}',
                         }
                     )
+
+                    # Actualizar campos adicionales si existen en el modelo
+                    if hasattr(factura, 'estado_sii'):
+                        factura.estado_sii = estado_sii
+                    if hasattr(factura, 'tipo_dte'):
+                        factura.tipo_dte = int(tipo_dte) if tipo_dte else None
+                    if hasattr(factura, 'folio'):
+                        factura.folio = int(numero_factura) if numero_factura.isdigit() else None
+                    if hasattr(factura, 'importado_sii'):
+                        factura.importado_sii = True
+                    if hasattr(factura, 'monto_exento'):
+                        factura.monto_exento = monto_exento
+
+                    factura.save()
 
                     if factura_created:
                         facturas_creadas += 1
