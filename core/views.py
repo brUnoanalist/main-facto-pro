@@ -305,7 +305,13 @@ def importar_sii(request):
             # Decodificar el archivo CSV
             decoded_file = csv_file.read().decode('utf-8-sig')
             io_string = io.StringIO(decoded_file)
-            csv_reader = csv.DictReader(io_string, delimiter=';')
+
+            # Detectar el delimitador automáticamente
+            sample = io_string.read(1024)
+            io_string.seek(0)
+            delimiter = ';' if sample.count(';') > sample.count(',') else ','
+
+            csv_reader = csv.DictReader(io_string, delimiter=delimiter)
 
             facturas_creadas = 0
             facturas_actualizadas = 0
@@ -315,33 +321,63 @@ def importar_sii(request):
                 try:
                     # Extraer datos del CSV del SII
                     # Los nombres de las columnas pueden variar según el formato del SII
-                    numero_factura = row.get('Número Documento') or row.get('Numero Documento') or row.get('Folio')
-                    rut_emisor = row.get('RUT Emisor') or row.get('Rut Emisor')
-                    razon_social = row.get('Razón Social') or row.get('Razon Social') or row.get('Nombre')
+                    numero_factura = row.get('Número Documento') or row.get('Numero Documento') or row.get('Folio') or row.get('folio')
+                    rut_emisor = row.get('RUT Emisor') or row.get('Rut Emisor') or row.get('RUTReceptor') or row.get('RutReceptor')
+                    razon_social = row.get('Razón Social') or row.get('Razon Social') or row.get('Nombre') or row.get('RazonSocialReceptor')
+
+                    # Validar que tengamos los datos mínimos requeridos
+                    if not numero_factura or not rut_emisor or not razon_social:
+                        errores.append(f'Fila {row_num}: Faltan datos requeridos (Folio, RUT o Razón Social)')
+                        continue
 
                     # Procesar fechas
-                    fecha_emision_str = row.get('Fecha Emisión') or row.get('Fecha Emision') or row.get('Fecha')
-                    fecha_vencimiento_str = row.get('Fecha Vencimiento')
+                    fecha_emision_str = row.get('Fecha Emisión') or row.get('Fecha Emision') or row.get('Fecha') or row.get('FechaEmision')
+                    fecha_vencimiento_str = row.get('Fecha Vencimiento') or row.get('FechaVencimiento')
 
                     # Procesar montos
-                    monto_neto_str = row.get('Monto Neto') or row.get('Neto') or '0'
+                    monto_neto_str = row.get('Monto Neto') or row.get('Neto') or row.get('MontoNeto') or '0'
                     monto_iva_str = row.get('Monto IVA') or row.get('IVA') or '0'
-                    monto_total_str = row.get('Monto Total') or row.get('Total')
+                    monto_total_str = row.get('Monto Total') or row.get('Total') or row.get('MontoTotal')
 
                     # Limpiar y convertir valores numéricos
-                    monto_neto = Decimal(monto_neto_str.replace('.', '').replace(',', '.')) if monto_neto_str else Decimal('0')
-                    monto_iva = Decimal(monto_iva_str.replace('.', '').replace(',', '.')) if monto_iva_str else Decimal('0')
-                    monto_total = Decimal(monto_total_str.replace('.', '').replace(',', '.')) if monto_total_str else Decimal('0')
+                    def parse_decimal(value_str):
+                        if not value_str or value_str == '0':
+                            return Decimal('0')
+                        # Limpiar el string
+                        cleaned = str(value_str).strip()
+                        # Si tiene punto como separador de miles y coma como decimal (formato chileno)
+                        if ',' in cleaned and '.' in cleaned:
+                            cleaned = cleaned.replace('.', '').replace(',', '.')
+                        # Si solo tiene coma (formato europeo)
+                        elif ',' in cleaned:
+                            cleaned = cleaned.replace(',', '.')
+                        return Decimal(cleaned)
+
+                    monto_neto = parse_decimal(monto_neto_str)
+                    monto_iva = parse_decimal(monto_iva_str)
+                    monto_total = parse_decimal(monto_total_str)
 
                     # Si no hay monto total, calcularlo
                     if monto_total == 0:
                         monto_total = monto_neto + monto_iva
 
-                    # Convertir fechas
-                    fecha_emision = dt.strptime(fecha_emision_str, '%d-%m-%Y').date() if fecha_emision_str else timezone.now().date()
+                    # Convertir fechas - intentar múltiples formatos
+                    def parse_date(date_str):
+                        if not date_str:
+                            return None
+                        date_str = date_str.strip()
+                        formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d']
+                        for fmt in formats:
+                            try:
+                                return dt.strptime(date_str, fmt).date()
+                            except ValueError:
+                                continue
+                        raise ValueError(f'Formato de fecha no reconocido: {date_str}')
+
+                    fecha_emision = parse_date(fecha_emision_str) if fecha_emision_str else timezone.now().date()
 
                     if fecha_vencimiento_str:
-                        fecha_vencimiento = dt.strptime(fecha_vencimiento_str, '%d-%m-%Y').date()
+                        fecha_vencimiento = parse_date(fecha_vencimiento_str)
                     else:
                         # Si no hay fecha de vencimiento, usar 30 días después de la emisión
                         fecha_vencimiento = fecha_emision + datetime.timedelta(days=30)
