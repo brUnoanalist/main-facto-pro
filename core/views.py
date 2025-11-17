@@ -300,7 +300,7 @@ def importar_sii(request):
             import csv
             import io
             from decimal import Decimal
-            from datetime import datetime
+            from datetime import datetime as dt
 
             # Decodificar el archivo CSV
             decoded_file = csv_file.read().decode('utf-8-sig')
@@ -338,10 +338,10 @@ def importar_sii(request):
                         monto_total = monto_neto + monto_iva
 
                     # Convertir fechas
-                    fecha_emision = datetime.strptime(fecha_emision_str, '%d-%m-%Y').date() if fecha_emision_str else timezone.now().date()
+                    fecha_emision = dt.strptime(fecha_emision_str, '%d-%m-%Y').date() if fecha_emision_str else timezone.now().date()
 
                     if fecha_vencimiento_str:
-                        fecha_vencimiento = datetime.strptime(fecha_vencimiento_str, '%d-%m-%Y').date()
+                        fecha_vencimiento = dt.strptime(fecha_vencimiento_str, '%d-%m-%Y').date()
                     else:
                         # Si no hay fecha de vencimiento, usar 30 días después de la emisión
                         fecha_vencimiento = fecha_emision + datetime.timedelta(days=30)
