@@ -391,25 +391,74 @@ def importar_sii(request):
 
             for row_num, row in enumerate(csv_reader, start=2):
                 try:
-                    # Extraer datos del CSV del SII
-                    # Los nombres de las columnas pueden variar según el formato del SII
-                    numero_factura = row.get('Número Documento') or row.get('Numero Documento') or row.get('Folio') or row.get('folio')
-                    rut_emisor = row.get('RUT Emisor') or row.get('Rut Emisor') or row.get('RUTReceptor') or row.get('RutReceptor')
-                    razon_social = row.get('Razón Social') or row.get('Razon Social') or row.get('Nombre') or row.get('RazonSocialReceptor')
+                    # Normalizar nombres de columnas (eliminar espacios y convertir a minúsculas para comparación)
+                    normalized_row = {k.strip().lower().replace(' ', '_'): v for k, v in row.items()}
+
+                    # Extraer datos del CSV del SII - soportar múltiples variantes de nombres de columnas
+                    numero_factura = (
+                        row.get('folio') or row.get('Folio') or
+                        row.get('Número Documento') or row.get('Numero Documento') or
+                        normalized_row.get('folio') or normalized_row.get('numero_documento')
+                    )
+
+                    rut_emisor = (
+                        row.get('rut_receptor') or row.get('RUT Receptor') or row.get('RUTReceptor') or
+                        row.get('rut_emisor') or row.get('RUT Emisor') or row.get('RUTEmisor') or
+                        normalized_row.get('rut_receptor') or normalized_row.get('rut_emisor')
+                    )
+
+                    razon_social = (
+                        row.get('razon_social_receptor') or row.get('Razón Social Receptor') or
+                        row.get('razon_social') or row.get('Razón Social') or row.get('Razon Social') or
+                        row.get('Nombre') or row.get('nombre') or row.get('RazonSocialReceptor') or
+                        normalized_row.get('razon_social_receptor') or normalized_row.get('razon_social')
+                    )
 
                     # Validar que tengamos los datos mínimos requeridos
                     if not numero_factura or not rut_emisor or not razon_social:
-                        errores.append(f'Fila {row_num}: Faltan datos requeridos (Folio, RUT o Razón Social)')
+                        errores.append(f'Fila {row_num}: Faltan datos requeridos (Folio={numero_factura}, RUT={rut_emisor}, Razón Social={razon_social})')
                         continue
 
-                    # Procesar fechas
-                    fecha_emision_str = row.get('Fecha Emisión') or row.get('Fecha Emision') or row.get('Fecha') or row.get('FechaEmision')
-                    fecha_vencimiento_str = row.get('Fecha Vencimiento') or row.get('FechaVencimiento')
+                    # Procesar fechas - soportar múltiples variantes
+                    fecha_emision_str = (
+                        row.get('fecha_emision') or row.get('Fecha Emisión') or row.get('Fecha Emision') or
+                        row.get('FechaEmision') or row.get('Fecha') or
+                        normalized_row.get('fecha_emision')
+                    )
 
-                    # Procesar montos
-                    monto_neto_str = row.get('Monto Neto') or row.get('Neto') or row.get('MontoNeto') or '0'
-                    monto_iva_str = row.get('Monto IVA') or row.get('IVA') or '0'
-                    monto_total_str = row.get('Monto Total') or row.get('Total') or row.get('MontoTotal')
+                    fecha_vencimiento_str = (
+                        row.get('fecha_vencimiento') or row.get('Fecha Vencimiento') or
+                        row.get('FechaVencimiento') or
+                        normalized_row.get('fecha_vencimiento')
+                    )
+
+                    # Procesar montos - soportar múltiples variantes
+                    monto_neto_str = (
+                        row.get('monto_neto') or row.get('Monto Neto') or row.get('MontoNeto') or
+                        row.get('Neto') or normalized_row.get('monto_neto') or '0'
+                    )
+
+                    monto_iva_str = (
+                        row.get('monto_iva') or row.get('Monto IVA') or row.get('MontoIVA') or
+                        row.get('IVA') or normalized_row.get('monto_iva') or '0'
+                    )
+
+                    monto_total_str = (
+                        row.get('monto_total') or row.get('Monto Total') or row.get('MontoTotal') or
+                        row.get('Total') or normalized_row.get('monto_total')
+                    )
+
+                    # Estado de pago del CSV
+                    estado_pago_str = (
+                        row.get('estado_pago') or row.get('Estado Pago') or row.get('EstadoPago') or
+                        normalized_row.get('estado_pago') or ''
+                    )
+
+                    # Monto pendiente
+                    monto_pendiente_str = (
+                        row.get('monto_pendiente') or row.get('Monto Pendiente') or row.get('MontoPendiente') or
+                        normalized_row.get('monto_pendiente') or '0'
+                    )
 
                     # Limpiar y convertir valores numéricos
                     def parse_decimal(value_str):
@@ -471,9 +520,44 @@ def importar_sii(request):
                         cliente.save()
 
                     # Extraer campos adicionales del SII si existen
-                    estado_sii = row.get('EstadoSII') or row.get('Estado SII') or 'Importada'
-                    tipo_dte = row.get('TipoDTE') or row.get('Tipo DTE') or '33'
-                    monto_exento = parse_decimal(row.get('MontoExento') or row.get('Monto Exento') or '0')
+                    estado_sii = (
+                        row.get('EstadoSII') or row.get('Estado SII') or
+                        normalized_row.get('estadosii') or normalized_row.get('estado_sii') or 'Importada'
+                    )
+
+                    tipo_dte_str = (
+                        row.get('tipo_dte') or row.get('TipoDTE') or row.get('Tipo DTE') or
+                        normalized_row.get('tipo_dte') or '33'
+                    )
+
+                    monto_exento = parse_decimal(
+                        row.get('MontoExento') or row.get('Monto Exento') or row.get('monto_exento') or
+                        normalized_row.get('monto_exento') or '0'
+                    )
+
+                    monto_pendiente = parse_decimal(monto_pendiente_str)
+
+                    # Determinar el estado de la factura basado en estado_pago o monto_pendiente
+                    estado_factura = 'pendiente'
+                    fecha_pago = None
+
+                    # Verificar estado de pago del CSV
+                    if estado_pago_str:
+                        estado_lower = estado_pago_str.strip().lower()
+                        # Si dice "pago" completo/total/etc
+                        if any(palabra in estado_lower for palabra in ['pago total', 'pago parcial', 'pago', 'pagada', 'pagado']):
+                            if 'parcial' in estado_lower:
+                                estado_factura = 'pendiente'  # Pago parcial sigue pendiente
+                            else:
+                                estado_factura = 'pagada'
+                                fecha_pago = timezone.now().date()
+                        elif 'impaga' in estado_lower:
+                            estado_factura = 'pendiente'
+
+                    # Si el monto pendiente es 0 o muy cercano a 0, está pagada
+                    if monto_pendiente == 0 or (monto_total > 0 and monto_pendiente < 100):  # menos de $100 se considera pagado
+                        estado_factura = 'pagada'
+                        fecha_pago = timezone.now().date() if not fecha_pago else fecha_pago
 
                     # Crear o actualizar factura
                     factura, factura_created = Factura.objects.update_or_create(
@@ -487,7 +571,8 @@ def importar_sii(request):
                             'monto_total': monto_total,
                             'fecha_emision': fecha_emision,
                             'fecha_vencimiento': fecha_vencimiento,
-                            'estado': 'pendiente',
+                            'fecha_pago': fecha_pago,
+                            'estado': estado_factura,
                             'descripcion': f'Importado desde SII - {razon_social}',
                         }
                     )
@@ -496,9 +581,15 @@ def importar_sii(request):
                     if hasattr(factura, 'estado_sii'):
                         factura.estado_sii = estado_sii
                     if hasattr(factura, 'tipo_dte'):
-                        factura.tipo_dte = int(tipo_dte) if tipo_dte else None
+                        try:
+                            factura.tipo_dte = int(tipo_dte_str) if tipo_dte_str else None
+                        except (ValueError, TypeError):
+                            factura.tipo_dte = 33  # Valor por defecto: factura electrónica
                     if hasattr(factura, 'folio'):
-                        factura.folio = int(numero_factura) if numero_factura.isdigit() else None
+                        try:
+                            factura.folio = int(numero_factura) if str(numero_factura).isdigit() else None
+                        except (ValueError, TypeError):
+                            factura.folio = None
                     if hasattr(factura, 'importado_sii'):
                         factura.importado_sii = True
                     if hasattr(factura, 'monto_exento'):
