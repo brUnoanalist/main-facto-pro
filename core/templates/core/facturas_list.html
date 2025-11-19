@@ -5,51 +5,68 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row mb-4">
+    <!-- Header moderno -->
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="mb-0"><i class="bi bi-file-earmark-text"></i> Gestión de Facturas</h1>
-            <p class="text-muted">Administra y controla todas tus facturas</p>
+            <h1 class="fw-bold mb-1" style="font-size: 2rem; color: #1e293b;">
+                <i class="bi bi-receipt-cutoff text-primary"></i> Gestión de Facturas
+            </h1>
+            <p class="text-muted mb-0">Administra y controla todas tus facturas en un solo lugar</p>
         </div>
         <div class="col-auto">
-            <a href="{% url 'importar_sii' %}" class="btn btn-success me-2">
+            <a href="{% url 'importar_sii' %}" class="btn btn-success shadow-sm me-2">
                 <i class="bi bi-cloud-upload"></i> Importar SII
             </a>
-            <a href="{% url 'factura_crear' %}" class="btn btn-primary">
-                <i class="bi bi-file-plus"></i> Nueva Factura
+            <a href="{% url 'factura_crear' %}" class="btn btn-primary shadow-sm">
+                <i class="bi bi-plus-circle"></i> Nueva Factura
             </a>
         </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtros modernos -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
+            <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="btn-group" role="group">
-                        <a href="{% url 'facturas_list' %}" 
-                           class="btn btn-outline-primary {% if filtro == 'todas' %}active{% endif %}">
-                            <i class="bi bi-list"></i> Todas
-                        </a>
-                        <a href="{% url 'facturas_list' %}?filtro=vencidas" 
-                           class="btn btn-outline-danger {% if filtro == 'vencidas' %}active{% endif %}">
-                            <i class="bi bi-exclamation-triangle"></i> Vencidas
-                        </a>
-                        <a href="{% url 'facturas_list' %}?filtro=proximas" 
-                           class="btn btn-outline-warning {% if filtro == 'proximas' %}active{% endif %}">
-                            <i class="bi bi-clock"></i> Próximas a Vencer
-                        </a>
-                        <a href="{% url 'facturas_list' %}?filtro=pagadas" 
-                           class="btn btn-outline-success {% if filtro == 'pagadas' %}active{% endif %}">
-                            <i class="bi bi-check-circle"></i> Pagadas
-                        </a>
-                    </div>
-                    <div class="float-end">
-                        <a href="{% url 'exportar_pdf' %}" class="btn btn-outline-danger">
-                            <i class="bi bi-file-pdf"></i> PDF
-                        </a>
-                        <a href="{% url 'exportar_excel' %}" class="btn btn-outline-success">
-                            <i class="bi bi-file-excel"></i> Excel
-                        </a>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="btn-group shadow-sm" role="group">
+                            <a href="{% url 'facturas_list' %}"
+                               class="btn {% if filtro == 'todas' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                <i class="bi bi-grid-3x3"></i> Todas
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=vigentes"
+                               class="btn {% if filtro == 'vigentes' %}btn-success{% else %}btn-outline-success{% endif %}">
+                                <i class="bi bi-check-circle"></i> Vigentes
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=por_vencer"
+                               class="btn {% if filtro == 'por_vencer' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                                <i class="bi bi-clock-history"></i> Por Vencer
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=vencidas"
+                               class="btn {% if filtro == 'vencidas' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                                <i class="bi bi-exclamation-triangle"></i> Vencidas
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=mora"
+                               class="btn {% if filtro == 'mora' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+                                <i class="bi bi-hourglass-split"></i> En Mora
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=incobrables"
+                               class="btn {% if filtro == 'incobrables' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                                <i class="bi bi-x-circle"></i> Incobrables
+                            </a>
+                            <a href="{% url 'facturas_list' %}?filtro=pagadas"
+                               class="btn {% if filtro == 'pagadas' %}btn-info{% else %}btn-outline-info{% endif %}">
+                                <i class="bi bi-cash-stack"></i> Pagadas
+                            </a>
+                        </div>
+                        <div class="btn-group shadow-sm">
+                            <a href="{% url 'exportar_pdf' %}" class="btn btn-outline-danger">
+                                <i class="bi bi-file-pdf"></i> PDF
+                            </a>
+                            <a href="{% url 'exportar_excel' %}" class="btn btn-outline-success">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -59,139 +76,183 @@
     <!-- Tabla de Facturas -->
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="bi bi-list-check"></i> 
-                        {% if filtro == 'vencidas' %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold d-flex align-items-center">
+                        <i class="bi bi-table text-primary me-2"></i>
+                        {% if filtro == 'vigentes' %}
+                            Facturas Vigentes
+                        {% elif filtro == 'por_vencer' %}
+                            Facturas Por Vencer
+                        {% elif filtro == 'vencidas' %}
                             Facturas Vencidas
-                        {% elif filtro == 'proximas' %}
-                            Facturas Próximas a Vencer
+                        {% elif filtro == 'mora' %}
+                            Facturas En Mora
+                        {% elif filtro == 'incobrables' %}
+                            Facturas Incobrables
                         {% elif filtro == 'pagadas' %}
                             Facturas Pagadas
+                        {% elif filtro == 'pendientes' %}
+                            Facturas Pendientes
                         {% else %}
                             Todas las Facturas
                         {% endif %}
-                        <span class="badge bg-primary ms-2">{{ facturas.count }}</span>
+                        <span class="badge bg-primary rounded-pill ms-3">{{ facturas.count }}</span>
                     </h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover mb-0 modern-table">
+                            <thead class="bg-light">
                                 <tr>
-                                    <th>N° Factura</th>
-                                    <th>Cliente</th>
-                                    <th>Monto</th>
-                                    <th>Emisión</th>
-                                    <th>Vencimiento</th>
-                                    <th>Estado</th>
-                                    <th>Días</th>
-                                    <th>Acciones</th>
+                                    <th class="border-0 py-3">N° Factura</th>
+                                    <th class="border-0 py-3">Cliente</th>
+                                    <th class="border-0 py-3">Monto</th>
+                                    <th class="border-0 py-3">Emisión</th>
+                                    <th class="border-0 py-3">Vencimiento</th>
+                                    <th class="border-0 py-3">Estado</th>
+                                    <th class="border-0 py-3">Días</th>
+                                    <th class="border-0 py-3 text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for factura in facturas %}
-                                <tr class="{% if factura.estado == 'vencida' %}table-danger{% elif factura.proxima_vencer %}table-warning{% endif %}">
-                                    <td>
-                                        <strong>{{ factura.numero_factura }}</strong>
+                                <tr>
+                                    <td class="align-middle">
+                                        <div>
+                                            <strong class="text-primary">{{ factura.numero_factura }}</strong>
+                                            {% if factura.importado_sii %}
+                                                <i class="bi bi-cloud-check text-success ms-1" title="Importado desde SII"></i>
+                                            {% endif %}
+                                        </div>
                                         {% if factura.descripcion %}
-                                        <br><small class="text-muted">{{ factura.descripcion|truncatewords:5 }}</small>
+                                            <small class="text-muted d-block">{{ factura.descripcion|truncatewords:5 }}</small>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <a href="{% url 'cliente_detalle' factura.cliente.pk %}" class="text-decoration-none">
+                                    <td class="align-middle">
+                                        <a href="{% url 'cliente_detalle' factura.cliente.pk %}" class="text-decoration-none text-dark">
                                             <div class="d-flex align-items-center">
-                                                <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-2" 
-                                                     style="width: 30px; height: 30px; font-size: 0.8rem;">
+                                                <div class="rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                     style="width: 36px; height: 36px; background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%); color: white; font-weight: 600; font-size: 0.875rem;">
                                                     {{ factura.cliente.nombre|slice:":1"|upper }}
                                                 </div>
-                                                {{ factura.cliente.nombre }}
+                                                <div>
+                                                    <div>{{ factura.cliente.nombre }}</div>
+                                                    {% if factura.cliente.rut %}
+                                                        <small class="text-muted">{{ factura.cliente.rut }}</small>
+                                                    {% endif %}
+                                                </div>
                                             </div>
                                         </a>
                                     </td>
-                                    <td>
-                                        <strong>{{ factura.monto_formateado }}</strong>
+                                    <td class="align-middle">
+                                        <strong class="text-dark">{{ factura.monto_formateado }}</strong>
                                     </td>
-                                    <td>{{ factura.fecha_emision|date:"d/m/Y" }}</td>
-                                    <td>
+                                    <td class="align-middle">
+                                        <small>{{ factura.fecha_emision|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td class="align-middle">
                                         {{ factura.fecha_vencimiento|date:"d/m/Y" }}
                                         {% if factura.proxima_vencer and factura.estado == 'pendiente' %}
-                                        <br><small class="badge bg-warning text-dark">
-                                            <i class="bi bi-exclamation-triangle"></i> Próxima
-                                        </small>
+                                            <br><span class="badge bg-warning text-dark rounded-pill mt-1" style="font-size: 0.7rem;">
+                                                <i class="bi bi-clock"></i> Próxima
+                                            </span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {% if factura.estado == 'vencida' %}
-                                            <span class="badge badge-vencida">
-                                                <i class="bi bi-x-circle"></i> Vencida
+                                    <td class="align-middle">
+                                        {% if factura.estado == 'pagada' %}
+                                            <span class="badge bg-info rounded-pill">
+                                                <i class="bi bi-cash-stack me-1"></i>Pagada
                                             </span>
-                                        {% elif factura.estado == 'pendiente' %}
-                                            <span class="badge badge-pendiente">
-                                                <i class="bi bi-clock"></i> Pendiente
+                                        {% elif factura.estado == 'anulada' %}
+                                            <span class="badge bg-secondary rounded-pill">
+                                                <i class="bi bi-x-circle me-1"></i>Anulada
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'vigente' %}
+                                            <span class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Vigente
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'por_vencer' %}
+                                            <span class="badge bg-warning rounded-pill">
+                                                <i class="bi bi-clock-history me-1"></i>Por Vencer
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'vencida' %}
+                                            <span class="badge bg-danger rounded-pill">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Vencida
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'mora' %}
+                                            <span class="badge bg-dark rounded-pill">
+                                                <i class="bi bi-hourglass-split me-1"></i>En Mora
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'incobrable' %}
+                                            <span class="badge bg-secondary rounded-pill" style="background: #1f2937 !important;">
+                                                <i class="bi bi-x-circle me-1"></i>Incobrable
                                             </span>
                                         {% else %}
-                                            <span class="badge badge-pagada">
-                                                <i class="bi bi-check-circle"></i> Pagada
+                                            <span class="badge bg-primary rounded-pill">
+                                                <i class="bi bi-file-text me-1"></i>Pendiente
                                             </span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="align-middle">
                                         {% if factura.dias_vencidos > 0 %}
-                                            <span class="badge bg-danger">
-                                                +{{ factura.dias_vencidos }} días
+                                            <span class="badge bg-danger rounded-pill">
+                                                <i class="bi bi-calendar-x me-1"></i>+{{ factura.dias_vencidos }} días
                                             </span>
                                         {% elif factura.estado == 'pagada' %}
-                                            <small class="text-muted">
-                                                {{ factura.fecha_pago|date:"d/m/Y" }}
+                                            <small class="text-success">
+                                                <i class="bi bi-check2-circle me-1"></i>{{ factura.fecha_pago|date:"d/m/Y" }}
                                             </small>
                                         {% else %}
-                                            <span class="badge bg-success">Al día</span>
+                                            <span class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check me-1"></i>Al día
+                                            </span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            {% if factura.estado != 'pagada' %}
-                                                <a href="{% url 'enviar_recordatorio' factura.pk %}" 
-                                                   class="btn btn-outline-primary" 
+                                    <td class="align-middle text-end">
+                                        {% if factura.estado != 'pagada' %}
+                                            <div class="btn-group btn-group-sm shadow-sm">
+                                                <a href="{% url 'enviar_recordatorio' factura.pk %}"
+                                                   class="btn btn-outline-primary"
                                                    title="Enviar recordatorio">
                                                     <i class="bi bi-envelope"></i>
                                                 </a>
-                                                <a href="{% url 'factura_pagar' factura.pk %}" 
-                                                   class="btn btn-outline-success" 
+                                                <a href="{% url 'factura_pagar' factura.pk %}"
+                                                   class="btn btn-outline-success"
                                                    title="Marcar como pagada"
                                                    onclick="return confirm('¿Confirmar pago de factura {{ factura.numero_factura }}?')">
                                                     <i class="bi bi-check-circle"></i>
                                                 </a>
-                                            {% else %}
-                                                <button class="btn btn-success btn-sm" disabled>
-                                                    <i class="bi bi-check2"></i> Pagada
-                                                </button>
-                                            {% endif %}
-                                        </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-all"></i> Pagada
+                                            </span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
                                     <td colspan="8" class="text-center py-5">
-                                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
-                                        <p class="text-muted mt-3 mb-0">
+                                        <div class="py-5">
+                                            <i class="bi bi-inbox fs-1 text-muted" style="opacity: 0.3;"></i>
+                                            <p class="text-muted mt-3 mb-0 fw-semibold">
+                                                {% if filtro == 'todas' %}
+                                                    No hay facturas registradas
+                                                {% elif filtro == 'vencidas' %}
+                                                    ¡Excelente! No hay facturas vencidas
+                                                {% elif filtro == 'proximas' %}
+                                                    No hay facturas próximas a vencer
+                                                {% else %}
+                                                    No hay facturas pagadas
+                                                {% endif %}
+                                            </p>
                                             {% if filtro == 'todas' %}
-                                                No hay facturas registradas
-                                            {% elif filtro == 'vencidas' %}
-                                                No hay facturas vencidas
-                                            {% elif filtro == 'proximas' %}
-                                                No hay facturas próximas a vencer
-                                            {% else %}
-                                                No hay facturas pagadas
+                                            <a href="{% url 'factura_crear' %}" class="btn btn-primary mt-3 shadow-sm">
+                                                <i class="bi bi-plus-circle"></i> Crear Primera Factura
+                                            </a>
                                             {% endif %}
-                                        </p>
-                                        {% if filtro == 'todas' %}
-                                        <a href="{% url 'factura_crear' %}" class="btn btn-primary mt-3">
-                                            <i class="bi bi-file-plus"></i> Crear Primera Factura
-                                        </a>
-                                        {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -202,43 +263,5 @@
             </div>
         </div>
     </div>
-
-    <!-- Resumen -->
-    {% if facturas %}
-    <div class="row mt-4">
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Total Facturas</h6>
-                    <h3 class="mb-0">{{ total_facturas }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Pendientes</h6>
-                    <h3 class="mb-0 text-warning">{{ facturas_pendientes }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Vencidas</h6>
-                    <h3 class="mb-0 text-danger">{{ facturas_vencidas }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Pagadas</h6>
-                    <h3 class="mb-0 text-success">{{ facturas_pagadas }}</h3>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

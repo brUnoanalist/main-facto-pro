@@ -5,90 +5,237 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row mb-4">
+    <!-- Header moderno -->
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard</h1>
-            <p class="text-muted">Resumen general del sistema</p>
+            <h1 class="fw-bold mb-1" style="font-size: 2rem; color: #1e293b;">
+                <i class="bi bi-grid-fill text-primary"></i> Dashboard
+            </h1>
+            <p class="text-muted mb-0" style="font-size: 0.95rem;">Bienvenido, {{ user.username }} - Resumen de tu negocio en tiempo real</p>
         </div>
         <div class="col-auto">
-            <a href="{% url 'exportar_pdf' %}" class="btn btn-danger me-2">
-                <i class="bi bi-file-pdf"></i> Exportar PDF
-            </a>
-            <a href="{% url 'exportar_excel' %}" class="btn btn-success">
-                <i class="bi bi-file-excel"></i> Exportar Excel
-            </a>
-        </div>
-    </div>
-
-    <!-- Tarjetas de estadísticas -->
-    <div class="row g-4 mb-4">
-        <div class="col-md-3">
-            <div class="card stat-card primary">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted mb-1">Total Clientes</h6>
-                        <h2 class="mb-0">{{ total_clientes }}</h2>
-                    </div>
-                    <i class="bi bi-people" style="font-size: 3rem; opacity: 0.3;"></i>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card stat-card warning">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted mb-1">Facturas Pendientes</h6>
-                        <h2 class="mb-0">{{ facturas_pendientes }}</h2>
-                    </div>
-                    <i class="bi bi-file-earmark-text" style="font-size: 3rem; opacity: 0.3;"></i>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card stat-card danger">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted mb-1">Facturas Vencidas</h6>
-                        <h2 class="mb-0 text-danger">{{ facturas_vencidas }}</h2>
-                    </div>
-                    <i class="bi bi-exclamation-triangle" style="font-size: 3rem; opacity: 0.3;"></i>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card stat-card success">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-muted mb-1">Total Pendiente</h6>
-                        <h2 class="mb-0 text-success">{{ total_pendiente|currency:"CLP" }}</h2>
-                    </div>
-                    <i class="bi bi-cash-stack" style="font-size: 3rem; opacity: 0.3;"></i>
-                </div>
+            <div class="btn-group shadow-sm" role="group">
+                <a href="{% url 'exportar_pdf' %}" class="btn btn-outline-danger">
+                    <i class="bi bi-file-pdf"></i> PDF
+                </a>
+                <a href="{% url 'exportar_excel' %}" class="btn btn-outline-success">
+                    <i class="bi bi-file-excel"></i> Excel
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Alertas -->
+    <!-- Tarjetas de estadísticas modernas -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-success bg-opacity-10 text-success rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-check-circle fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-muted mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem;">Vigentes</p>
+                            <h4 class="mb-0 fw-bold text-success">{{ facturas_vigentes }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top">
+                        <span class="text-success small" style="font-size: 0.75rem;">{{ monto_vigentes|currency:"CLP" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-warning bg-opacity-10 text-warning rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-clock-history fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-muted mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem;">Por Vencer</p>
+                            <h4 class="mb-0 fw-bold text-warning">{{ facturas_por_vencer }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top">
+                        <span class="text-warning small" style="font-size: 0.75rem;">{{ monto_por_vencer|currency:"CLP" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-danger bg-opacity-10 text-danger rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-exclamation-triangle fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-muted mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem;">Vencidas</p>
+                            <h4 class="mb-0 fw-bold text-danger">{{ facturas_vencidas }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top">
+                        <span class="text-danger small" style="font-size: 0.75rem;">{{ monto_vencidas|currency:"CLP" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-dark bg-opacity-10 text-dark rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-hourglass-split fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-muted mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem;">En Mora</p>
+                            <h4 class="mb-0 fw-bold text-dark">{{ facturas_en_mora }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top">
+                        <span class="text-dark small" style="font-size: 0.75rem;">{{ monto_en_mora|currency:"CLP" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.1) 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-dark text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-x-circle fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-muted mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem;">Incobrables</p>
+                            <h4 class="mb-0 fw-bold text-dark">{{ facturas_incobrables }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-dark">
+                        <span class="text-dark small" style="font-size: 0.75rem;">{{ monto_incobrables|currency:"CLP" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="card modern-stat-card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-white bg-opacity-25 text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-cash-stack fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-white mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem; opacity: 0.9;">Total Por Cobrar</p>
+                            <h4 class="mb-0 fw-bold text-white" style="font-size: 1.1rem;">{{ total_pendiente|currency:"CLP" }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-white border-opacity-25">
+                        <span class="text-white small" style="font-size: 0.75rem; opacity: 0.9;">{{ facturas_pendientes }} facturas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos modernos en la parte superior -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-graph-up text-primary"></i> Tendencia de Facturas
+                        <small class="text-muted fs-6 ms-2">Últimos 6 meses</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="tendenciaChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-pie-chart text-primary"></i> Distribución
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="estadosChart" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-bar-chart text-primary"></i> Montos por Estado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="montosChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Acciones rápidas modernas -->
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-lightning-charge text-warning"></i> Acciones Rápidas
+                    </h5>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <a href="{% url 'cliente_crear' %}" class="btn btn-outline-primary mb-2 text-start">
+                        <i class="bi bi-person-plus me-2"></i> Nuevo Cliente
+                    </a>
+                    <a href="{% url 'factura_crear' %}" class="btn btn-outline-primary mb-2 text-start">
+                        <i class="bi bi-file-plus me-2"></i> Nueva Factura
+                    </a>
+                    <a href="{% url 'importar_sii' %}" class="btn btn-outline-success mb-2 text-start">
+                        <i class="bi bi-cloud-upload me-2"></i> Importar SII
+                    </a>
+                    <a href="{% url 'configuracion' %}" class="btn btn-outline-secondary text-start">
+                        <i class="bi bi-gear me-2"></i> Configuración
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas y últimas facturas -->
     {% if facturas_vencidas > 0 %}
-    <div class="row mb-4">
+    <div class="row mb-3">
         <div class="col">
-            <div class="alert alert-danger alert-custom" style="border-left-color: var(--danger-color);">
-                <h5><i class="bi bi-exclamation-circle"></i> ¡Atención!</h5>
-                <p class="mb-0">Tienes <strong>{{ facturas_vencidas }}</strong> facturas vencidas que requieren seguimiento inmediato.</p>
+            <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
+                <div>
+                    <h6 class="mb-1 fw-bold">¡Atención Requerida!</h6>
+                    <p class="mb-0">Tienes <strong>{{ facturas_vencidas }}</strong> facturas vencidas que requieren seguimiento inmediato.</p>
+                </div>
             </div>
         </div>
     </div>
     {% endif %}
 
     {% if facturas_proximas > 0 %}
-    <div class="row mb-4">
+    <div class="row mb-3">
         <div class="col">
-            <div class="alert alert-warning alert-custom" style="border-left-color: var(--warning-color);">
-                <h5><i class="bi bi-clock-history"></i> Recordatorio</h5>
-                <p class="mb-0"><strong>{{ facturas_proximas }}</strong> facturas próximas a vencer en los próximos 7 días.</p>
+            <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
+                <i class="bi bi-clock-history me-3 fs-4"></i>
+                <div>
+                    <h6 class="mb-1 fw-bold">Recordatorio</h6>
+                    <p class="mb-0"><strong>{{ facturas_proximas }}</strong> facturas próximas a vencer en los próximos 7 días.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -97,66 +244,82 @@
     <!-- Últimas facturas -->
     <div class="row">
         <div class="col">
-            <div class="card">
-                <div class="card-header bg-white py-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-list-ul"></i> Últimas Facturas</h5>
-                        <a href="{% url 'facturas_list' %}" class="btn btn-sm btn-outline-primary">
-                            Ver todas <i class="bi bi-arrow-right"></i>
+                        <h5 class="mb-0 fw-semibold">
+                            <i class="bi bi-receipt text-primary"></i> Últimas Facturas
+                        </h5>
+                        <a href="{% url 'facturas_list' %}" class="btn btn-sm btn-primary">
+                            Ver todas <i class="bi bi-arrow-right ms-1"></i>
                         </a>
                     </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover mb-0 modern-table">
+                            <thead class="bg-light">
                                 <tr>
-                                    <th>N° Factura</th>
-                                    <th>Cliente</th>
-                                    <th>Monto</th>
-                                    <th>Vencimiento</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
+                                    <th class="border-0 py-3">N° Factura</th>
+                                    <th class="border-0 py-3">Cliente</th>
+                                    <th class="border-0 py-3">Monto</th>
+                                    <th class="border-0 py-3">Vencimiento</th>
+                                    <th class="border-0 py-3">Estado</th>
+                                    <th class="border-0 py-3 text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for factura in ultimas_facturas %}
                                 <tr>
-                                    <td><strong>{{ factura.numero_factura }}</strong></td>
-                                    <td>
-                                        <a href="{% url 'cliente_detalle' factura.cliente.pk %}">
-                                            {{ factura.cliente.nombre }}
+                                    <td class="align-middle"><strong class="text-primary">{{ factura.numero_factura }}</strong></td>
+                                    <td class="align-middle">
+                                        <a href="{% url 'cliente_detalle' factura.cliente.pk %}" class="text-decoration-none text-dark">
+                                            <i class="bi bi-person-circle me-1"></i>{{ factura.cliente.nombre }}
                                         </a>
                                     </td>
-                                    <td><strong>{{ factura.monto_formateado }}</strong></td>
-                                    <td>{{ factura.fecha_vencimiento|date:"d/m/Y" }}</td>
-                                    <td>
+                                    <td class="align-middle"><strong>{{ factura.monto_formateado }}</strong></td>
+                                    <td class="align-middle">{{ factura.fecha_vencimiento|date:"d/m/Y" }}</td>
+                                    <td class="align-middle">
                                         {% if factura.estado == 'vencida' %}
-                                            <span class="badge badge-vencida">Vencida</span>
+                                            <span class="badge bg-danger rounded-pill">
+                                                <i class="bi bi-x-circle me-1"></i>Vencida
+                                            </span>
                                         {% elif factura.estado == 'pendiente' %}
-                                            <span class="badge badge-pendiente">Pendiente</span>
+                                            <span class="badge bg-warning rounded-pill">
+                                                <i class="bi bi-clock me-1"></i>Pendiente
+                                            </span>
+                                        {% elif factura.estado == 'impaga' %}
+                                            <span class="badge bg-dark rounded-pill">
+                                                <i class="bi bi-x-octagon me-1"></i>Impaga
+                                            </span>
                                         {% else %}
-                                            <span class="badge badge-pagada">Pagada</span>
+                                            <span class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Pagada
+                                            </span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="align-middle text-end">
                                         {% if factura.estado != 'pagada' %}
-                                        <a href="{% url 'enviar_recordatorio' factura.pk %}" 
-                                           class="btn btn-sm btn-outline-primary" 
-                                           title="Enviar recordatorio">
-                                            <i class="bi bi-envelope"></i>
-                                        </a>
-                                        <a href="{% url 'factura_pagar' factura.pk %}" 
-                                           class="btn btn-sm btn-outline-success" 
-                                           title="Marcar como pagada">
-                                            <i class="bi bi-check-circle"></i>
-                                        </a>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'enviar_recordatorio' factura.pk %}"
+                                               class="btn btn-outline-primary"
+                                               title="Enviar recordatorio">
+                                                <i class="bi bi-envelope"></i>
+                                            </a>
+                                            <a href="{% url 'factura_pagar' factura.pk %}"
+                                               class="btn btn-outline-success"
+                                               title="Marcar como pagada"
+                                               onclick="return confirm('¿Confirmar pago?')">
+                                                <i class="bi bi-check-circle"></i>
+                                            </a>
+                                        </div>
                                         {% endif %}
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="bi bi-inbox fs-1 d-block mb-2" style="opacity: 0.3;"></i>
                                         No hay facturas registradas
                                     </td>
                                 </tr>
@@ -168,96 +331,41 @@
             </div>
         </div>
     </div>
-
-    <!-- Gráficos modernos -->
-    <div class="row g-4 mb-4 mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Distribución por Estado</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="estadosChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Montos por Estado</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="montosChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Facturas por Mes (Últimos 6 Meses)</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="tendenciaChart" style="max-height: 250px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Acciones rápidas -->
-    <div class="row mt-4">
-        <div class="col">
-            <div class="card">
-                <div class="card-body text-center py-4">
-                    <h5 class="mb-3">Acciones Rápidas</h5>
-                    <a href="{% url 'cliente_crear' %}" class="btn btn-primary me-2">
-                        <i class="bi bi-person-plus"></i> Nuevo Cliente
-                    </a>
-                    <a href="{% url 'factura_crear' %}" class="btn btn-primary me-2">
-                        <i class="bi bi-file-plus"></i> Nueva Factura
-                    </a>
-                    <a href="{% url 'importar_sii' %}" class="btn btn-success me-2">
-                        <i class="bi bi-cloud-upload"></i> Importar desde SII
-                    </a>
-                    <a href="{% url 'configuracion' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-gear"></i> Configuración
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
     const colors = {
-        pendiente: '#f59e0b',
+        vigente: '#10b981',
+        por_vencer: '#f59e0b',
         vencida: '#ef4444',
-        impaga: '#dc2626',
-        pagada: '#10b981',
+        mora: '#7c3aed',
+        incobrable: '#1f2937',
+        pagada: '#06b6d4',
     };
 
-    // Gráfico de distribución por estado (Doughnut)
+    // Gráfico de distribución por estado de cobranza (Doughnut)
     const ctxEstados = document.getElementById('estadosChart').getContext('2d');
     new Chart(ctxEstados, {
         type: 'doughnut',
         data: {
-            labels: ['Pendientes', 'Vencidas', 'Impagas', 'Pagadas'],
+            labels: ['Vigentes', 'Por Vencer', 'Vencidas', 'En Mora', 'Incobrables', 'Pagadas'],
             datasets: [{
                 data: [
-                    {{ facturas_pendientes }},
+                    {{ facturas_vigentes }},
+                    {{ facturas_por_vencer }},
                     {{ facturas_vencidas }},
-                    {{ facturas_impagas }},
+                    {{ facturas_en_mora }},
+                    {{ facturas_incobrables }},
                     {{ facturas_pagadas }}
                 ],
                 backgroundColor: [
-                    colors.pendiente,
+                    colors.vigente,
+                    colors.por_vencer,
                     colors.vencida,
-                    colors.impaga,
+                    colors.mora,
+                    colors.incobrable,
                     colors.pagada,
                 ],
                 borderWidth: 0,
@@ -290,25 +398,27 @@
         }
     });
 
-    // Gráfico de montos por estado (Barras horizontales)
+    // Gráfico de montos por estado de cobranza (Barras horizontales)
     const ctxMontos = document.getElementById('montosChart').getContext('2d');
     new Chart(ctxMontos, {
         type: 'bar',
         data: {
-            labels: ['Pendientes', 'Vencidas', 'Impagas', 'Pagadas'],
+            labels: ['Vigentes', 'Por Vencer', 'Vencidas', 'En Mora', 'Incobrables'],
             datasets: [{
                 label: 'Monto (CLP)',
                 data: [
-                    {{ monto_pendientes }},
+                    {{ monto_vigentes }},
+                    {{ monto_por_vencer }},
                     {{ monto_vencidas }},
-                    {{ monto_impagas }},
-                    {{ monto_pagadas }}
+                    {{ monto_en_mora }},
+                    {{ monto_incobrables }}
                 ],
                 backgroundColor: [
-                    colors.pendiente,
+                    colors.vigente,
+                    colors.por_vencer,
                     colors.vencida,
-                    colors.impaga,
-                    colors.pagada,
+                    colors.mora,
+                    colors.incobrable,
                 ],
                 borderRadius: 8,
                 borderSkipped: false,

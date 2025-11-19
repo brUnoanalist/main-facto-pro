@@ -20,21 +20,42 @@ class Cliente(models.Model):
         return self.nombre
 
     def total_deuda(self):
-        return sum(f.monto for f in self.facturas.filter(estado='pendiente'))
+        """Retorna el total de deuda (solo facturas pendientes)"""
+        return sum(
+            f.monto_total if f.monto_total else f.monto
+            for f in self.facturas.filter(estado='pendiente')
+        )
 
     def facturas_vencidas(self):
+        """Retorna el número de facturas pendientes con estado de cobranza vencida, mora o incobrable"""
         return self.facturas.filter(
             estado='pendiente',
-            fecha_vencimiento__lt=timezone.now().date()
+            estado_cobranza__in=['vencida', 'mora', 'incobrable']
+        ).count()
+
+    def facturas_en_mora(self):
+        """Retorna el número de facturas en mora"""
+        return self.facturas.filter(
+            estado='pendiente',
+            estado_cobranza='mora'
         ).count()
 
 
 class Factura(models.Model):
+    # Estados principales - Modelo simplificado y profesional
     ESTADO_CHOICES = [
         ('pendiente', 'Pendiente'),
         ('pagada', 'Pagada'),
-        ('vencida', 'Vencida'),
-        ('impaga', 'Impaga'),
+        ('anulada', 'Anulada'),
+    ]
+
+    # Sub-estados de cobranza (solo para facturas pendientes)
+    ESTADO_COBRANZA_CHOICES = [
+        ('vigente', 'Vigente'),           # No ha vencido
+        ('por_vencer', 'Por Vencer'),     # Vence en 7 días o menos
+        ('vencida', 'Vencida'),           # Pasó la fecha de vencimiento
+        ('mora', 'En Mora'),              # Vencida + 30 días
+        ('incobrable', 'Incobrable'),     # Vencida + 90 días
     ]
 
     # Obtener opciones de moneda de forma dinámica
@@ -61,6 +82,7 @@ class Factura(models.Model):
     fecha_emision = models.DateField()
     fecha_vencimiento = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
+    estado_cobranza = models.CharField(max_length=20, choices=ESTADO_COBRANZA_CHOICES, default='vigente', null=True, blank=True)
     estado_sii = models.CharField(max_length=50, default='Pendiente')
     tipo_dte = models.IntegerField(null=True, blank=True)
     folio = models.IntegerField(null=True, blank=True)
@@ -77,15 +99,38 @@ class Factura(models.Model):
         return f"{self.numero_factura} - {self.cliente.nombre}"
 
     def dias_vencidos(self):
+        """Retorna los días que lleva vencida la factura"""
         if self.estado == 'pendiente' and self.fecha_vencimiento < timezone.now().date():
             return (timezone.now().date() - self.fecha_vencimiento).days
         return 0
 
     def proxima_vencer(self):
+        """Verifica si la factura está próxima a vencer (7 días o menos)"""
         if self.estado == 'pendiente':
             dias = (self.fecha_vencimiento - timezone.now().date()).days
             return 0 <= dias <= 7
         return False
+
+    def actualizar_estado_cobranza(self):
+        """Actualiza automáticamente el estado de cobranza según la fecha"""
+        if self.estado != 'pendiente':
+            self.estado_cobranza = None
+            return
+
+        hoy = timezone.now().date()
+        dias_vencido = (hoy - self.fecha_vencimiento).days
+        dias_para_vencer = (self.fecha_vencimiento - hoy).days
+
+        if dias_vencido >= 90:
+            self.estado_cobranza = 'incobrable'
+        elif dias_vencido >= 30:
+            self.estado_cobranza = 'mora'
+        elif dias_vencido > 0:
+            self.estado_cobranza = 'vencida'
+        elif dias_para_vencer <= 7:
+            self.estado_cobranza = 'por_vencer'
+        else:
+            self.estado_cobranza = 'vigente'
 
     def monto_formateado(self):
         """Retorna el monto formateado según la moneda de la factura"""
@@ -93,8 +138,11 @@ class Factura(models.Model):
         return formatear_moneda(self.monto, self.moneda)
 
     def save(self, *args, **kwargs):
-        if self.estado == 'pendiente' and self.fecha_vencimiento < timezone.now().date():
-            self.estado = 'vencida'
+        # Actualizar estado de cobranza automáticamente
+        if self.estado == 'pendiente':
+            self.actualizar_estado_cobranza()
+        else:
+            self.estado_cobranza = None
         super().save(*args, **kwargs)
 
 

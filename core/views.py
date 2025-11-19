@@ -12,6 +12,16 @@ from .forms import ClienteForm, FacturaForm, ConfiguracionForm
 from .utils import generar_pdf_reporte, generar_excel_reporte, enviar_recordatorio_email
 import datetime
 
+
+def actualizar_estados_cobranza(facturas):
+    """
+    Actualiza los estados de cobranza de las facturas pendientes.
+    Esta función debe llamarse en cada vista que muestre facturas.
+    """
+    for factura in facturas.filter(estado='pendiente'):
+        factura.actualizar_estado_cobranza()
+        factura.save()
+
 def register_view(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
@@ -44,46 +54,65 @@ def dashboard(request):
     clientes = Cliente.objects.filter(usuario=request.user, activo=True)
     facturas = Factura.objects.filter(usuario=request.user)
 
-    # Actualizar estados de facturas vencidas
-    facturas.filter(
-        estado='pendiente',
-        fecha_vencimiento__lt=timezone.now().date()
-    ).update(estado='vencida')
+    # Actualizar estados de cobranza
+    actualizar_estados_cobranza(facturas)
 
-    facturas_vencidas = facturas.filter(estado='vencida').count()
+    # Contadores por estado principal
     facturas_pendientes = facturas.filter(estado='pendiente').count()
-    facturas_impagas = facturas.filter(estado='impaga').count()
     facturas_pagadas = facturas.filter(estado='pagada').count()
+    facturas_anuladas = facturas.filter(estado='anulada').count()
 
+    # Contadores por estado de cobranza (solo pendientes)
+    facturas_vigentes = facturas.filter(estado='pendiente', estado_cobranza='vigente').count()
+    facturas_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').count()
+    facturas_vencidas = facturas.filter(estado='pendiente', estado_cobranza='vencida').count()
+    facturas_en_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').count()
+    facturas_incobrables = facturas.filter(estado='pendiente', estado_cobranza='incobrable').count()
+
+    # Facturas próximas a vencer (7 días o menos)
     facturas_proximas = facturas.filter(
         estado='pendiente',
-        fecha_vencimiento__lte=timezone.now().date() + datetime.timedelta(days=7),
-        fecha_vencimiento__gte=timezone.now().date()
+        estado_cobranza='por_vencer'
     )
 
-    total_pendiente = facturas.filter(estado__in=['pendiente', 'vencida', 'impaga']).aggregate(
+    # Total por cobrar (solo pendientes)
+    total_pendiente = facturas.filter(estado='pendiente').aggregate(
         total=Sum(Case(
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
     )['total'] or 0
 
-    # Montos por estado para gráfico de barras
-    monto_vencidas = facturas.filter(estado='vencida').aggregate(
+    # Montos por estado de cobranza para gráficos
+    monto_vigentes = facturas.filter(estado='pendiente', estado_cobranza='vigente').aggregate(
         total=Sum(Case(
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
     )['total'] or 0
 
-    monto_impagas = facturas.filter(estado='impaga').aggregate(
+    monto_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').aggregate(
         total=Sum(Case(
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
     )['total'] or 0
 
-    monto_pendientes = facturas.filter(estado='pendiente').aggregate(
+    monto_vencidas = facturas.filter(estado='pendiente', estado_cobranza='vencida').aggregate(
+        total=Sum(Case(
+            When(monto_total__gt=0, then=F('monto_total')),
+            default=F('monto')
+        ))
+    )['total'] or 0
+
+    monto_en_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').aggregate(
+        total=Sum(Case(
+            When(monto_total__gt=0, then=F('monto_total')),
+            default=F('monto')
+        ))
+    )['total'] or 0
+
+    monto_incobrables = facturas.filter(estado='pendiente', estado_cobranza='incobrable').aggregate(
         total=Sum(Case(
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
@@ -117,17 +146,26 @@ def dashboard(request):
     context = {
         'total_clientes': clientes.count(),
         'total_facturas': facturas.count(),
-        'facturas_vencidas': facturas_vencidas,
+        # Estados principales
         'facturas_pendientes': facturas_pendientes,
-        'facturas_impagas': facturas_impagas,
         'facturas_pagadas': facturas_pagadas,
-        'facturas_proximas': facturas_proximas.count(),
-        'total_pendiente': total_pendiente,
-        'ultimas_facturas': facturas[:10],
+        # Estados de cobranza (solo para pendientes)
+        'facturas_vigentes': facturas_vigentes,
+        'facturas_por_vencer': facturas_por_vencer,
+        'facturas_vencidas': facturas_vencidas,
+        'facturas_en_mora': facturas_en_mora,
+        'facturas_incobrables': facturas_incobrables,
+        # Montos por estado de cobranza
+        'monto_vigentes': float(monto_vigentes),
+        'monto_por_vencer': float(monto_por_vencer),
         'monto_vencidas': float(monto_vencidas),
-        'monto_impagas': float(monto_impagas),
-        'monto_pendientes': float(monto_pendientes),
+        'monto_en_mora': float(monto_en_mora),
+        'monto_incobrables': float(monto_incobrables),
         'monto_pagadas': float(monto_pagadas),
+        # Total pendiente (suma de todos los estados de cobranza)
+        'total_pendiente': float(monto_vigentes + monto_por_vencer + monto_vencidas + monto_en_mora + monto_incobrables),
+        # Otros datos
+        'ultimas_facturas': facturas.order_by('-fecha_emision')[:10],
         'meses_labels': json.dumps(meses_labels),
         'meses_data': json.dumps(meses_data),
     }
@@ -136,12 +174,21 @@ def dashboard(request):
 @login_required
 def clientes_list(request):
     clientes = Cliente.objects.filter(usuario=request.user, activo=True)
+
+    # Actualizar estados de cobranza de todas las facturas
+    facturas = Factura.objects.filter(usuario=request.user)
+    actualizar_estados_cobranza(facturas)
+
     return render(request, 'core/clientes_list.html', {'clientes': clientes})
 
 @login_required
 def cliente_detalle(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk, usuario=request.user)
+
+    # Actualizar estados de cobranza
     facturas = cliente.facturas.all()
+    actualizar_estados_cobranza(facturas)
+
     return render(request, 'core/cliente_detalle.html', {
         'cliente': cliente,
         'facturas': facturas
@@ -178,23 +225,37 @@ def cliente_editar(request, pk):
 def facturas_list(request):
     todas_facturas = Factura.objects.filter(usuario=request.user)
 
-    # Calcular conteos para las tarjetas
+    # Actualizar estados de cobranza
+    actualizar_estados_cobranza(todas_facturas)
+
+    # Calcular conteos para las tarjetas - Estados principales
     total_facturas = todas_facturas.count()
-    facturas_vencidas = todas_facturas.filter(estado='vencida').count()
     facturas_pagadas = todas_facturas.filter(estado='pagada').count()
     facturas_pendientes = todas_facturas.filter(estado='pendiente').count()
 
+    # Conteos por estado de cobranza
+    facturas_vigentes = todas_facturas.filter(estado='pendiente', estado_cobranza='vigente').count()
+    facturas_por_vencer = todas_facturas.filter(estado='pendiente', estado_cobranza='por_vencer').count()
+    facturas_vencidas = todas_facturas.filter(estado='pendiente', estado_cobranza='vencida').count()
+    facturas_en_mora = todas_facturas.filter(estado='pendiente', estado_cobranza='mora').count()
+    facturas_incobrables = todas_facturas.filter(estado='pendiente', estado_cobranza='incobrable').count()
+
     # Filtrar según la selección del usuario
     filtro = request.GET.get('filtro', 'todas')
-    if filtro == 'vencidas':
-        facturas = todas_facturas.filter(estado='vencida')
-    elif filtro == 'proximas':
-        facturas = todas_facturas.filter(
-            estado='pendiente',
-            fecha_vencimiento__lte=timezone.now().date() + datetime.timedelta(days=7)
-        )
+    if filtro == 'vigentes':
+        facturas = todas_facturas.filter(estado='pendiente', estado_cobranza='vigente')
+    elif filtro == 'por_vencer':
+        facturas = todas_facturas.filter(estado='pendiente', estado_cobranza='por_vencer')
+    elif filtro == 'vencidas':
+        facturas = todas_facturas.filter(estado='pendiente', estado_cobranza='vencida')
+    elif filtro == 'mora':
+        facturas = todas_facturas.filter(estado='pendiente', estado_cobranza='mora')
+    elif filtro == 'incobrables':
+        facturas = todas_facturas.filter(estado='pendiente', estado_cobranza='incobrable')
     elif filtro == 'pagadas':
         facturas = todas_facturas.filter(estado='pagada')
+    elif filtro == 'pendientes':
+        facturas = todas_facturas.filter(estado='pendiente')
     else:
         facturas = todas_facturas
 
@@ -202,9 +263,14 @@ def facturas_list(request):
         'facturas': facturas,
         'filtro': filtro,
         'total_facturas': total_facturas,
-        'facturas_vencidas': facturas_vencidas,
-        'facturas_pagadas': facturas_pagadas,
         'facturas_pendientes': facturas_pendientes,
+        'facturas_pagadas': facturas_pagadas,
+        # Estados de cobranza
+        'facturas_vigentes': facturas_vigentes,
+        'facturas_por_vencer': facturas_por_vencer,
+        'facturas_vencidas': facturas_vencidas,
+        'facturas_en_mora': facturas_en_mora,
+        'facturas_incobrables': facturas_incobrables,
     })
 
 @login_required
@@ -266,19 +332,25 @@ def enviar_recordatorio(request, pk):
 
 @login_required
 def exportar_pdf(request):
-    facturas = Factura.objects.filter(
-        usuario=request.user,
-        estado__in=['pendiente', 'vencida']
-    )
+    facturas = Factura.objects.filter(usuario=request.user)
+
+    # Actualizar estados de cobranza
+    actualizar_estados_cobranza(facturas)
+
+    # Exportar solo facturas pendientes
+    facturas = facturas.filter(estado='pendiente')
     response = generar_pdf_reporte(request.user, facturas)
     return response
 
 @login_required
 def exportar_excel(request):
-    facturas = Factura.objects.filter(
-        usuario=request.user,
-        estado__in=['pendiente', 'vencida']
-    )
+    facturas = Factura.objects.filter(usuario=request.user)
+
+    # Actualizar estados de cobranza
+    actualizar_estados_cobranza(facturas)
+
+    # Exportar solo facturas pendientes
+    facturas = facturas.filter(estado='pendiente')
     response = generar_excel_reporte(request.user, facturas)
     return response
 
