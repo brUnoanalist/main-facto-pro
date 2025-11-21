@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, logout
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.db.models import Q, Sum, Count, Case, When, F
 from django.db.models.functions import TruncMonth
@@ -10,6 +10,9 @@ from django.http import HttpResponse
 from .models import Cliente, Factura, ConfiguracionRecordatorio, HistorialRecordatorio
 from .forms import ClienteForm, FacturaForm, ConfiguracionForm
 from .utils import generar_pdf_reporte, generar_excel_reporte, enviar_recordatorio_email
+from .models import validar_rut_chileno, formatear_rut
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 import datetime
 
 
@@ -26,9 +29,11 @@ def register_view(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            user.email = request.POST.get('email', '')
+            user.save()
             ConfiguracionRecordatorio.objects.create(usuario=user)
-            login(request, user)
+            login(request, user, backend='core.backends.EmailBackend')
             messages.success(request, '¡Registro exitoso!')
             return redirect('dashboard')
     else:
@@ -36,14 +41,17 @@ def register_view(request):
     return render(request, 'core/register.html', {'form': form})
 
 def login_view(request):
+    error = None
     if request.method == 'POST':
-        form = AuthenticationForm(data=request.POST)
-        if form.is_valid():
-            login(request, form.get_user())
+        email = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            login(request, user)
             return redirect('dashboard')
-    else:
-        form = AuthenticationForm()
-    return render(request, 'core/login.html', {'form': form})
+        else:
+            error = 'Correo electrónico o contraseña incorrectos'
+    return render(request, 'core/login.html', {'error': error})
 
 def logout_view(request):
     logout(request)
@@ -56,6 +64,113 @@ def dashboard(request):
 
     # Actualizar estados de cobranza
     actualizar_estados_cobranza(facturas)
+
+    # ========== SISTEMA DE ALERTAS INTELIGENTES ==========
+    alertas = []
+
+    # Alerta 1: Facturas vencidas este mes
+    inicio_mes = timezone.now().date().replace(day=1)
+    facturas_vencidas_mes = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__gte=inicio_mes,
+        fecha_vencimiento__lt=timezone.now().date()
+    ).count()
+    if facturas_vencidas_mes > 0:
+        alertas.append({
+            'tipo': 'danger',
+            'icono': 'exclamation-triangle-fill',
+            'mensaje': f'Tienes {facturas_vencidas_mes} facturas vencidas este mes',
+            'accion': 'facturas_list',
+            'filtro': 'vencidas'
+        })
+
+    # Alerta 2: Facturas por vencer en los próximos 7 días
+    proxima_semana = timezone.now().date() + datetime.timedelta(days=7)
+    facturas_por_vencer_pronto = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__gte=timezone.now().date(),
+        fecha_vencimiento__lte=proxima_semana
+    ).count()
+    if facturas_por_vencer_pronto > 0:
+        alertas.append({
+            'tipo': 'warning',
+            'icono': 'clock-fill',
+            'mensaje': f'{facturas_por_vencer_pronto} facturas vencen en los próximos 7 días',
+            'accion': 'facturas_list',
+            'filtro': 'por_vencer'
+        })
+
+    # Alerta 3: Facturas en mora (+30 días vencidas)
+    facturas_mora_count = facturas.filter(estado='pendiente', estado_cobranza='mora').count()
+    if facturas_mora_count > 0:
+        monto_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').aggregate(
+            total=Sum(Case(
+                When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+                default=F('monto_total')
+            ))
+        )['total'] or 0
+        alertas.append({
+            'tipo': 'danger',
+            'icono': 'hourglass-split',
+            'mensaje': f'{facturas_mora_count} facturas en mora por ${monto_mora:,.0f}',
+            'accion': 'facturas_list',
+            'filtro': 'mora'
+        })
+
+    # Alerta 4: Concentración de clientes (análisis 80/20)
+    if facturas.filter(estado='pendiente').exists():
+        total_pendiente_global = facturas.filter(estado='pendiente').aggregate(
+            total=Sum(Case(
+                When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+                default=F('monto_total')
+            ))
+        )['total'] or 0
+
+        if total_pendiente_global > 0:
+            # Top 5 clientes con más deuda
+            top_clientes = facturas.filter(estado='pendiente').values('cliente__nombre').annotate(
+                deuda=Sum(Case(
+                    When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+                    default=F('monto_total')
+                ))
+            ).order_by('-deuda')[:5]
+
+            deuda_top5 = sum(c['deuda'] for c in top_clientes)
+            porcentaje_concentracion = (deuda_top5 / total_pendiente_global) * 100 if total_pendiente_global > 0 else 0
+
+            if porcentaje_concentracion >= 70:
+                alertas.append({
+                    'tipo': 'info',
+                    'icono': 'pie-chart-fill',
+                    'mensaje': f'5 clientes concentran el {porcentaje_concentracion:.0f}% de tu cartera por cobrar',
+                    'accion': None,
+                    'filtro': None
+                })
+
+    # Alerta 5: Facturas sin fecha de vencimiento o con datos incompletos
+    facturas_sin_vencimiento = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__isnull=True
+    ).count()
+    if facturas_sin_vencimiento > 0:
+        alertas.append({
+            'tipo': 'secondary',
+            'icono': 'question-circle-fill',
+            'mensaje': f'{facturas_sin_vencimiento} facturas sin fecha de vencimiento',
+            'accion': 'facturas_list',
+            'filtro': 'pendientes'
+        })
+
+    # Alerta 6: Facturas incobrables (+90 días)
+    facturas_incobrables_count = facturas.filter(estado='pendiente', estado_cobranza='incobrable').count()
+    if facturas_incobrables_count > 0:
+        alertas.append({
+            'tipo': 'dark',
+            'icono': 'x-circle-fill',
+            'mensaje': f'{facturas_incobrables_count} facturas podrían ser incobrables (+90 días)',
+            'accion': 'facturas_list',
+            'filtro': 'incobrables'
+        })
 
     # Contadores por estado principal
     facturas_pendientes = facturas.filter(estado='pendiente').count()
@@ -75,17 +190,38 @@ def dashboard(request):
         estado_cobranza='por_vencer'
     )
 
-    # Total por cobrar (solo pendientes)
+    # Total por cobrar - suma directa de monto_pendiente de facturas pendientes
     total_pendiente = facturas.filter(estado='pendiente').aggregate(
-        total=Sum(Case(
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
-    # Montos por estado de cobranza para gráficos
+    # Total pagado - suma directa de monto_pagado de todas las facturas
+    total_pagado = facturas.aggregate(
+        total=Sum('monto_pagado')
+    )['total'] or 0
+
+    # Total facturado
+    total_facturado = facturas.aggregate(
+        total=Sum('monto_total')
+    )['total'] or 0
+
+    # Total de facturas con pago parcial
+    facturas_pago_parcial = facturas.filter(
+        estado='pendiente',
+        monto_pagado__gt=0,
+        monto_pendiente__gt=0
+    ).count()
+
+    # Monto total de pagos parciales recibidos
+    monto_pagos_parciales = facturas.filter(
+        estado='pendiente',
+        monto_pagado__gt=0
+    ).aggregate(total=Sum('monto_pagado'))['total'] or 0
+
+    # Montos por estado de cobranza para gráficos (usar monto_pendiente si existe)
     monto_vigentes = facturas.filter(estado='pendiente', estado_cobranza='vigente').aggregate(
         total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
@@ -93,6 +229,7 @@ def dashboard(request):
 
     monto_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').aggregate(
         total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
@@ -100,6 +237,7 @@ def dashboard(request):
 
     monto_vencidas = facturas.filter(estado='pendiente', estado_cobranza='vencida').aggregate(
         total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
@@ -107,6 +245,7 @@ def dashboard(request):
 
     monto_en_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').aggregate(
         total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
@@ -114,6 +253,7 @@ def dashboard(request):
 
     monto_incobrables = facturas.filter(estado='pendiente', estado_cobranza='incobrable').aggregate(
         total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
             When(monto_total__gt=0, then=F('monto_total')),
             default=F('monto')
         ))
@@ -126,22 +266,77 @@ def dashboard(request):
         ))
     )['total'] or 0
 
-    # Facturas por mes (últimos 6 meses) para gráfico de línea
-    facturas_por_mes = facturas.filter(
-        fecha_emision__gte=timezone.now().date() - datetime.timedelta(days=180)
-    ).annotate(
+    # Facturas por mes para gráfico de línea (últimos 12 meses con datos)
+    facturas_por_mes = facturas.annotate(
         mes=TruncMonth('fecha_emision')
     ).values('mes').annotate(
         total=Count('id')
     ).order_by('mes')
 
+    # Limitar a los últimos 12 meses con datos
+    facturas_por_mes_list = list(facturas_por_mes)[-12:]
+
     # Preparar datos para el gráfico
     import json
     meses_labels = []
     meses_data = []
-    for item in facturas_por_mes:
+    for item in facturas_por_mes_list:
         meses_labels.append(item['mes'].strftime('%b %Y'))
         meses_data.append(item['total'])
+
+    # ========== MAPA DE VENCIMIENTO ==========
+    hoy = timezone.now().date()
+
+    # 0-30 días vencidas
+    vencidas_0_30 = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__lt=hoy,
+        fecha_vencimiento__gte=hoy - datetime.timedelta(days=30)
+    )
+    monto_0_30 = vencidas_0_30.aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    # 31-60 días vencidas
+    vencidas_31_60 = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__lt=hoy - datetime.timedelta(days=30),
+        fecha_vencimiento__gte=hoy - datetime.timedelta(days=60)
+    )
+    monto_31_60 = vencidas_31_60.aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    # 61-90 días vencidas
+    vencidas_61_90 = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__lt=hoy - datetime.timedelta(days=60),
+        fecha_vencimiento__gte=hoy - datetime.timedelta(days=90)
+    )
+    monto_61_90 = vencidas_61_90.aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    # +90 días vencidas
+    vencidas_90_mas = facturas.filter(
+        estado='pendiente',
+        fecha_vencimiento__lt=hoy - datetime.timedelta(days=90)
+    )
+    monto_90_mas = vencidas_90_mas.aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
 
     context = {
         'total_clientes': clientes.count(),
@@ -155,6 +350,11 @@ def dashboard(request):
         'facturas_vencidas': facturas_vencidas,
         'facturas_en_mora': facturas_en_mora,
         'facturas_incobrables': facturas_incobrables,
+        # Métricas de pagos parciales
+        'facturas_pago_parcial': facturas_pago_parcial,
+        'monto_pagos_parciales': float(monto_pagos_parciales),
+        'total_pagado': float(total_pagado),
+        'total_facturado': float(total_facturado),
         # Montos por estado de cobranza
         'monto_vigentes': float(monto_vigentes),
         'monto_por_vencer': float(monto_por_vencer),
@@ -163,7 +363,18 @@ def dashboard(request):
         'monto_incobrables': float(monto_incobrables),
         'monto_pagadas': float(monto_pagadas),
         # Total pendiente (suma de todos los estados de cobranza)
-        'total_pendiente': float(monto_vigentes + monto_por_vencer + monto_vencidas + monto_en_mora + monto_incobrables),
+        'total_pendiente': float(total_pendiente),
+        # Alertas inteligentes
+        'alertas': alertas,
+        # Mapa de vencimiento
+        'vencidas_0_30': vencidas_0_30.count(),
+        'monto_0_30': float(monto_0_30),
+        'vencidas_31_60': vencidas_31_60.count(),
+        'monto_31_60': float(monto_31_60),
+        'vencidas_61_90': vencidas_61_90.count(),
+        'monto_61_90': float(monto_61_90),
+        'vencidas_90_mas': vencidas_90_mas.count(),
+        'monto_90_mas': float(monto_90_mas),
         # Otros datos
         'ultimas_facturas': facturas.order_by('-fecha_emision')[:10],
         'meses_labels': json.dumps(meses_labels),
@@ -179,7 +390,31 @@ def clientes_list(request):
     facturas = Factura.objects.filter(usuario=request.user)
     actualizar_estados_cobranza(facturas)
 
-    return render(request, 'core/clientes_list.html', {'clientes': clientes})
+    # Búsqueda
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        clientes = clientes.filter(
+            Q(nombre__icontains=busqueda) |
+            Q(rut__icontains=busqueda) |
+            Q(email__icontains=busqueda)
+        )
+
+    # Ordenamiento
+    orden = request.GET.get('orden', 'nombre')
+    if orden in ['nombre', '-nombre', 'rut', '-rut', '-fecha_registro']:
+        clientes = clientes.order_by(orden)
+
+    # Paginación
+    paginator = Paginator(clientes, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'core/clientes_list.html', {
+        'clientes': page_obj,
+        'page_obj': page_obj,
+        'busqueda': busqueda,
+        'orden': orden,
+    })
 
 @login_required
 def cliente_detalle(request, pk):
@@ -259,9 +494,34 @@ def facturas_list(request):
     else:
         facturas = todas_facturas
 
+    # ========== BÚSQUEDA ==========
+    busqueda = request.GET.get('q', '').strip()
+    if busqueda:
+        facturas = facturas.filter(
+            Q(numero_factura__icontains=busqueda) |
+            Q(cliente__nombre__icontains=busqueda) |
+            Q(cliente__rut__icontains=busqueda) |
+            Q(descripcion__icontains=busqueda)
+        )
+
+    # ========== ORDENAMIENTO ==========
+    orden = request.GET.get('orden', '-fecha_emision')
+    ordenes_validos = ['fecha_emision', '-fecha_emision', 'fecha_vencimiento', '-fecha_vencimiento',
+                      'monto_total', '-monto_total', 'cliente__nombre', '-cliente__nombre']
+    if orden in ordenes_validos:
+        facturas = facturas.order_by(orden)
+
+    # ========== PAGINACIÓN ==========
+    paginator = Paginator(facturas, 25)  # 25 facturas por página
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     return render(request, 'core/facturas_list.html', {
-        'facturas': facturas,
+        'facturas': page_obj,
+        'page_obj': page_obj,
         'filtro': filtro,
+        'busqueda': busqueda,
+        'orden': orden,
         'total_facturas': total_facturas,
         'facturas_pendientes': facturas_pendientes,
         'facturas_pagadas': facturas_pagadas,
@@ -292,6 +552,10 @@ def factura_marcar_pagada(request, pk):
     factura = get_object_or_404(Factura, pk=pk, usuario=request.user)
     factura.estado = 'pagada'
     factura.fecha_pago = timezone.now().date()
+    # Actualizar montos: todo pasa a pagado
+    factura.monto_pagado = factura.monto_total or factura.monto or 0
+    factura.monto_pendiente = 0
+    factura.estado_cobranza = None
     factura.save()
     messages.success(request, 'Factura marcada como pagada')
     return redirect('facturas_list')
@@ -357,7 +621,105 @@ def exportar_excel(request):
 @login_required
 def importar_sii(request):
     """Vista para importar facturas desde archivos CSV del SII"""
+    import csv
+    import io
+    from decimal import Decimal
+    from datetime import datetime as dt
+
+    # Funciones auxiliares para parseo
+    def parse_decimal(value_str):
+        if not value_str or value_str == '0':
+            return Decimal('0')
+        cleaned = str(value_str).strip()
+        if ',' in cleaned and '.' in cleaned:
+            cleaned = cleaned.replace('.', '').replace(',', '.')
+        elif ',' in cleaned:
+            cleaned = cleaned.replace(',', '.')
+        return Decimal(cleaned)
+
+    def parse_date(date_str):
+        if not date_str:
+            return None
+        date_str = date_str.strip()
+        formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d']
+        for fmt in formats:
+            try:
+                return dt.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        raise ValueError(f'Formato de fecha no reconocido: {date_str}')
+
     if request.method == 'POST':
+        # Paso 2: Confirmar importación
+        if 'confirmar_importacion' in request.POST:
+            csv_data = request.session.get('csv_preview_data')
+            if not csv_data:
+                messages.error(request, 'No hay datos para importar. Por favor, sube el archivo nuevamente.')
+                return redirect('importar_sii')
+
+            facturas_creadas = 0
+            facturas_actualizadas = 0
+            errores = []
+
+            for item in csv_data:
+                try:
+                    # Buscar o crear cliente
+                    cliente, created = Cliente.objects.get_or_create(
+                        rut=item['rut'],
+                        usuario=request.user,
+                        defaults={
+                            'nombre': item['razon_social'],
+                            'email': f'{item["rut"].replace("-", "").replace(".", "")}@temp.com',
+                            'activo': True
+                        }
+                    )
+
+                    if not created and cliente.nombre != item['razon_social']:
+                        cliente.nombre = item['razon_social']
+                        cliente.save()
+
+                    # Crear o actualizar factura
+                    factura, factura_created = Factura.objects.update_or_create(
+                        numero_factura=item['folio'],
+                        usuario=request.user,
+                        defaults={
+                            'cliente': cliente,
+                            'monto': Decimal(str(item['monto_total'])),
+                            'monto_total': Decimal(str(item['monto_total'])),
+                            'monto_pagado': Decimal(str(item['monto_pagado'])),
+                            'monto_pendiente': Decimal(str(item['monto_pendiente'])),
+                            'fecha_emision': dt.strptime(item['fecha_emision'], '%Y-%m-%d').date(),
+                            'fecha_vencimiento': dt.strptime(item['fecha_vencimiento'], '%Y-%m-%d').date() if item['fecha_vencimiento'] else None,
+                            'fecha_pago': dt.strptime(item['fecha_pago'], '%Y-%m-%d').date() if item.get('fecha_pago') else None,
+                            'estado': item['estado'],
+                            'descripcion': f'Importado desde SII - {item["razon_social"]}',
+                        }
+                    )
+
+                    if factura_created:
+                        facturas_creadas += 1
+                    else:
+                        facturas_actualizadas += 1
+
+                except Exception as e:
+                    errores.append(f'Folio {item["folio"]}: {str(e)}')
+
+            # Limpiar datos de sesión
+            if 'csv_preview_data' in request.session:
+                del request.session['csv_preview_data']
+
+            mensaje_exito = f'Importación completada: {facturas_creadas} facturas creadas, {facturas_actualizadas} actualizadas'
+            messages.success(request, mensaje_exito)
+
+            if errores:
+                for error in errores[:5]:
+                    messages.warning(request, error)
+                if len(errores) > 5:
+                    messages.warning(request, f'... y {len(errores) - 5} errores más')
+
+            return redirect('facturas_list')
+
+        # Paso 1: Subir archivo y mostrar vista previa
         csv_file = request.FILES.get('csv_file')
 
         if not csv_file:
@@ -369,11 +731,6 @@ def importar_sii(request):
             return redirect('importar_sii')
 
         try:
-            import csv
-            import io
-            from decimal import Decimal
-            from datetime import datetime as dt
-
             # Decodificar el archivo CSV
             decoded_file = csv_file.read().decode('utf-8-sig')
             io_string = io.StringIO(decoded_file)
@@ -385,9 +742,10 @@ def importar_sii(request):
 
             csv_reader = csv.DictReader(io_string, delimiter=delimiter)
 
-            facturas_creadas = 0
-            facturas_actualizadas = 0
+            preview_data = []
             errores = []
+            total_monto = Decimal('0')
+            total_pendiente = Decimal('0')
 
             for row_num, row in enumerate(csv_reader, start=2):
                 try:
@@ -434,20 +792,6 @@ def importar_sii(request):
                     monto_neto_str = '0'
                     monto_iva_str = '0'
 
-                    # Limpiar y convertir valores numéricos
-                    def parse_decimal(value_str):
-                        if not value_str or value_str == '0':
-                            return Decimal('0')
-                        # Limpiar el string
-                        cleaned = str(value_str).strip()
-                        # Si tiene punto como separador de miles y coma como decimal (formato chileno)
-                        if ',' in cleaned and '.' in cleaned:
-                            cleaned = cleaned.replace('.', '').replace(',', '.')
-                        # Si solo tiene coma (formato europeo)
-                        elif ',' in cleaned:
-                            cleaned = cleaned.replace(',', '.')
-                        return Decimal(cleaned)
-
                     monto_neto = parse_decimal(monto_neto_str)
                     monto_iva = parse_decimal(monto_iva_str)
                     monto_total = parse_decimal(monto_total_str)
@@ -455,19 +799,6 @@ def importar_sii(request):
                     # Si no hay monto total, calcularlo
                     if monto_total == 0:
                         monto_total = monto_neto + monto_iva
-
-                    # Convertir fechas - intentar múltiples formatos
-                    def parse_date(date_str):
-                        if not date_str:
-                            return None
-                        date_str = date_str.strip()
-                        formats = ['%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d']
-                        for fmt in formats:
-                            try:
-                                return dt.strptime(date_str, fmt).date()
-                            except ValueError:
-                                continue
-                        raise ValueError(f'Formato de fecha no reconocido: {date_str}')
 
                     fecha_emision = parse_date(fecha_emision_str) if fecha_emision_str else timezone.now().date()
 
@@ -477,39 +808,9 @@ def importar_sii(request):
                         # Si no hay fecha de vencimiento, usar 30 días después de la emisión
                         fecha_vencimiento = fecha_emision + datetime.timedelta(days=30)
 
-                    # Buscar o crear cliente
-                    cliente, created = Cliente.objects.get_or_create(
-                        rut=rut_emisor,
-                        usuario=request.user,
-                        defaults={
-                            'nombre': razon_social,
-                            'email': f'{rut_emisor.replace("-", "").replace(".", "")}@temp.com',
-                            'activo': True
-                        }
-                    )
-
-                    # Actualizar el nombre si el cliente ya existía pero el nombre es diferente
-                    if not created and cliente.nombre != razon_social:
-                        cliente.nombre = razon_social
-                        cliente.save()
-
-                    # Extraer campos adicionales del SII si existen
-                    estado_sii = (
-                        row.get('EstadoSII') or row.get('Estado SII') or
-                        normalized_row.get('estadosii') or normalized_row.get('estado_sii') or 'Importada'
-                    )
-
-                    tipo_dte_str = (
-                        row.get('tipo_dte') or row.get('TipoDTE') or row.get('Tipo DTE') or
-                        normalized_row.get('tipo_dte') or '33'
-                    )
-
-                    monto_exento = parse_decimal(
-                        row.get('MontoExento') or row.get('Monto Exento') or row.get('monto_exento') or
-                        normalized_row.get('monto_exento') or '0'
-                    )
-
                     monto_pendiente = parse_decimal(monto_pendiente_str)
+                    # Calcular monto pagado
+                    monto_pagado = monto_total - monto_pendiente if monto_total > 0 else Decimal('0')
 
                     # Determinar el estado de la factura basado en estado_pago o monto_pendiente
                     estado_factura = 'pendiente'
@@ -518,82 +819,100 @@ def importar_sii(request):
                     # Verificar estado de pago del CSV
                     if estado_pago_str:
                         estado_lower = estado_pago_str.strip().lower()
-                        # Si dice "pago" completo/total/etc
-                        if any(palabra in estado_lower for palabra in ['pago total', 'pago parcial', 'pago', 'pagada', 'pagado']):
-                            if 'parcial' in estado_lower:
-                                estado_factura = 'pendiente'  # Pago parcial sigue pendiente
-                            else:
-                                estado_factura = 'pagada'
-                                fecha_pago = timezone.now().date()
+
+                        # Pago Total - factura completamente pagada
+                        if 'pago total' in estado_lower or estado_lower == 'pagada' or estado_lower == 'pagado':
+                            estado_factura = 'pagada'
+                            fecha_pago = timezone.now().date()
+                        # Pago Parcial - factura pendiente con abono
+                        elif 'pago parcial' in estado_lower or 'parcial' in estado_lower:
+                            estado_factura = 'pendiente'
+                        # Impaga - factura sin pagos
                         elif 'impaga' in estado_lower:
                             estado_factura = 'pendiente'
+                        # Al día - factura vigente sin vencimiento
+                        elif 'al día' in estado_lower or 'al dia' in estado_lower:
+                            estado_factura = 'pendiente'
+                        # Por vencer - factura próxima a vencer
+                        elif 'por vencer' in estado_lower:
+                            estado_factura = 'pendiente'
+                        # Default: pendiente
+                        else:
+                            estado_factura = 'pendiente'
 
-                    # Si el monto pendiente es 0 o muy cercano a 0, está pagada
-                    if monto_pendiente == 0 or (monto_total > 0 and monto_pendiente < 100):  # menos de $100 se considera pagado
+                    # Si el monto pendiente es 0, está pagada
+                    if monto_pendiente == 0:
                         estado_factura = 'pagada'
                         fecha_pago = timezone.now().date() if not fecha_pago else fecha_pago
+                        monto_pagado = monto_total
 
-                    # Crear o actualizar factura
-                    factura, factura_created = Factura.objects.update_or_create(
+                    # Verificar si ya existe la factura
+                    existe = Factura.objects.filter(
                         numero_factura=numero_factura,
-                        usuario=request.user,
-                        defaults={
-                            'cliente': cliente,
-                            'monto': monto_total,
-                            'monto_neto': monto_neto,
-                            'monto_iva': monto_iva,
-                            'monto_total': monto_total,
-                            'fecha_emision': fecha_emision,
-                            'fecha_vencimiento': fecha_vencimiento,
-                            'fecha_pago': fecha_pago,
-                            'estado': estado_factura,
-                            'descripcion': f'Importado desde SII - {razon_social}',
-                        }
-                    )
+                        usuario=request.user
+                    ).exists()
 
-                    # Actualizar campos adicionales si existen en el modelo
-                    if hasattr(factura, 'estado_sii'):
-                        factura.estado_sii = estado_sii
-                    if hasattr(factura, 'tipo_dte'):
-                        try:
-                            factura.tipo_dte = int(tipo_dte_str) if tipo_dte_str else None
-                        except (ValueError, TypeError):
-                            factura.tipo_dte = 33  # Valor por defecto: factura electrónica
-                    if hasattr(factura, 'folio'):
-                        try:
-                            factura.folio = int(numero_factura) if str(numero_factura).isdigit() else None
-                        except (ValueError, TypeError):
-                            factura.folio = None
-                    if hasattr(factura, 'importado_sii'):
-                        factura.importado_sii = True
-                    if hasattr(factura, 'monto_exento'):
-                        factura.monto_exento = monto_exento
-
-                    factura.save()
-
-                    if factura_created:
-                        facturas_creadas += 1
-                    else:
-                        facturas_actualizadas += 1
+                    # Agregar a la vista previa
+                    preview_item = {
+                        'row_num': row_num,
+                        'folio': numero_factura,
+                        'rut': rut_emisor,
+                        'razon_social': razon_social,
+                        'fecha_emision': fecha_emision.strftime('%Y-%m-%d'),
+                        'fecha_vencimiento': fecha_vencimiento.strftime('%Y-%m-%d') if fecha_vencimiento else '',
+                        'monto_total': float(monto_total),
+                        'monto_pendiente': float(monto_pendiente),
+                        'monto_pagado': float(monto_pagado),
+                        'estado': estado_factura,
+                        'fecha_pago': fecha_pago.strftime('%Y-%m-%d') if fecha_pago else None,
+                        'existe': existe,
+                        'valido': True
+                    }
+                    preview_data.append(preview_item)
+                    total_monto += monto_total
+                    total_pendiente += monto_pendiente
 
                 except Exception as e:
-                    errores.append(f'Fila {row_num}: {str(e)}')
+                    errores.append({
+                        'row_num': row_num,
+                        'error': str(e)
+                    })
                     continue
 
-            # Mostrar resumen de la importación
-            mensaje_exito = f'Importación completada: {facturas_creadas} facturas creadas, {facturas_actualizadas} actualizadas'
-            messages.success(request, mensaje_exito)
+            # Guardar datos en sesión para confirmar
+            request.session['csv_preview_data'] = preview_data
 
-            if errores:
-                for error in errores[:5]:  # Mostrar solo los primeros 5 errores
-                    messages.warning(request, error)
-                if len(errores) > 5:
-                    messages.warning(request, f'... y {len(errores) - 5} errores más')
+            # Contar estadísticas
+            nuevas = len([p for p in preview_data if not p['existe']])
+            actualizadas = len([p for p in preview_data if p['existe']])
+            pagadas = len([p for p in preview_data if p['estado'] == 'pagada'])
+            pendientes = len([p for p in preview_data if p['estado'] == 'pendiente'])
 
-            return redirect('facturas_list')
+            return render(request, 'core/importar_sii.html', {
+                'preview': True,
+                'preview_data': preview_data,
+                'errores': errores,
+                'total_facturas': len(preview_data),
+                'nuevas': nuevas,
+                'actualizadas': actualizadas,
+                'pagadas': pagadas,
+                'pendientes': pendientes,
+                'total_monto': float(total_monto),
+                'total_pendiente': float(total_pendiente),
+            })
 
         except Exception as e:
             messages.error(request, f'Error al procesar el archivo: {str(e)}')
             return redirect('importar_sii')
 
     return render(request, 'core/importar_sii.html')
+
+
+def error_404(request, exception):
+    """Vista personalizada para errores 404"""
+    return render(request, '404.html', status=404)
+
+
+def error_500(request):
+    """Vista personalizada para errores 500"""
+    return render(request, '500.html', status=500)

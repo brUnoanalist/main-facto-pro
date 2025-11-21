@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'core',
 ]
 
@@ -59,6 +60,11 @@ TEMPLATES = [{
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Backend de autenticación personalizado (permite login con email)
+AUTHENTICATION_BACKENDS = [
+    'core.backends.EmailBackend',
+]
 
 # Configuración de Email (Gmail ejemplo)
 #EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

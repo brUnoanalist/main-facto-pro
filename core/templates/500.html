@@ -1,0 +1,28 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Error del servidor{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="py-5">
+                <i class="bi bi-gear text-danger" style="font-size: 5rem;"></i>
+                <h1 class="display-4 fw-bold mt-4">500</h1>
+                <h2 class="mb-4">Error del servidor</h2>
+                <p class="text-muted mb-4">
+                    Ha ocurrido un error inesperado. Nuestro equipo ha sido notificado y estamos trabajando para solucionarlo.
+                </p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                        <i class="bi bi-house me-2"></i>Ir al Dashboard
+                    </a>
+                    <a href="javascript:location.reload()" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Reintentar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

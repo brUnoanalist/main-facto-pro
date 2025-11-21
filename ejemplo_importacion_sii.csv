@@ -1,0 +1,7 @@
+folio,tipo_dte,fecha_emision,fecha_vencimiento,rut_receptor,razon_social_receptor,monto_total,monto_pendiente,estado_pago
+10000,33,2024-10-31,2024-12-15,11.107.207-1,Cliente 8,691302,691302,Impaga
+10001,33,2024-11-21,2024-12-06,11.104.204-6,Cliente 5,346434,64488,Pago Parcial
+10002,33,2024-12-17,2025-02-15,11.117.217-1,Cliente 18,1097113,1060806,Pago Parcial
+10003,33,2024-11-30,2025-01-29,11.101.201-9,Cliente 2,1212061,1212061,Impaga
+10004,33,2024-10-25,2024-12-09,11.111.211-K,Cliente 12,1461237,767755,Pago Parcial
+10005,33,2024-09-15,2024-11-14,12.345.678-9,Cliente Test,500000,0,Pago Total

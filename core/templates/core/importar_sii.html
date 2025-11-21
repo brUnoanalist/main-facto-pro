@@ -1,146 +1,423 @@
 {% extends 'core/base.html' %}
+{% load humanize %}
 
 {% block title %}Importar desde SII{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row mb-4">
+    <!-- Header moderno -->
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="mb-0"><i class="bi bi-cloud-upload"></i> Importar Facturas desde SII</h1>
-            <p class="text-muted">Carga facturas directamente desde archivos CSV del SII</p>
+            <h1 class="fw-bold mb-1" style="font-size: 2rem; color: #1e293b;">
+                <i class="bi bi-cloud-arrow-up-fill text-success"></i> Importar Facturas desde SII
+            </h1>
+            <p class="text-muted mb-0">Carga facturas directamente desde archivos CSV del SII de forma rápida y automatizada</p>
         </div>
         <div class="col-auto">
-            <a href="{% url 'facturas_list' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Volver a Facturas
+            <a href="{% url 'facturas_list' %}" class="btn btn-outline-secondary shadow-sm">
+                <i class="bi bi-arrow-left"></i> Volver
             </a>
         </div>
     </div>
 
     <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <!-- Instrucciones -->
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instrucciones</h5>
+        <div class="col-lg-{% if preview %}12{% else %}8{% endif %} mx-auto">
+            {% if preview %}
+            <!-- Vista Previa de Importación -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-eye text-primary me-2"></i>Vista Previa de Importación
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <ol class="mb-0">
-                        <li class="mb-2">Descarga el archivo CSV desde el portal del SII</li>
-                        <li class="mb-2">Asegúrate de que el archivo contenga las columnas:
-                            <code>Número Documento</code>, <code>RUT Emisor</code>, <code>Razón Social</code>,
-                            <code>Fecha Emisión</code>, <code>Monto Total</code>
-                        </li>
-                        <li class="mb-2">El archivo debe estar en formato CSV con separador <code>;</code> (punto y coma)</li>
-                        <li class="mb-0">Selecciona el archivo y haz clic en "Importar Facturas"</li>
-                    </ol>
+                    <!-- Resumen de la importación -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-primary bg-opacity-10 h-100">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary fw-bold">{{ total_facturas }}</h3>
+                                    <small class="text-muted">Total Facturas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-success bg-opacity-10 h-100">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-success fw-bold">{{ nuevas }}</h3>
+                                    <small class="text-muted">Nuevas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-warning bg-opacity-10 h-100">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-warning fw-bold">{{ actualizadas }}</h3>
+                                    <small class="text-muted">A Actualizar</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-info bg-opacity-10 h-100">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-info fw-bold">${{ total_monto|floatformat:0|intcomma }}</h3>
+                                    <small class="text-muted">Monto Total</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if errores %}
+                    <div class="alert alert-warning mb-4">
+                        <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Errores encontrados</h6>
+                        <ul class="mb-0 small">
+                            {% for error in errores %}
+                            <li>Fila {{ error.row_num }}: {{ error.error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <!-- Tabla de preview -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="bg-light sticky-top">
+                                <tr>
+                                    <th class="border-0 py-2">Folio</th>
+                                    <th class="border-0 py-2">Cliente</th>
+                                    <th class="border-0 py-2">RUT</th>
+                                    <th class="border-0 py-2">Emisión</th>
+                                    <th class="border-0 py-2 text-end">Total</th>
+                                    <th class="border-0 py-2 text-end">Pendiente</th>
+                                    <th class="border-0 py-2 text-center">Estado</th>
+                                    <th class="border-0 py-2 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in preview_data %}
+                                <tr>
+                                    <td class="py-2"><strong>{{ item.folio }}</strong></td>
+                                    <td class="py-2">{{ item.razon_social|truncatewords:3 }}</td>
+                                    <td class="py-2"><small class="text-muted">{{ item.rut }}</small></td>
+                                    <td class="py-2">{{ item.fecha_emision }}</td>
+                                    <td class="py-2 text-end">${{ item.monto_total|floatformat:0|intcomma }}</td>
+                                    <td class="py-2 text-end">
+                                        {% if item.monto_pendiente > 0 %}
+                                        <span class="text-danger">${{ item.monto_pendiente|floatformat:0|intcomma }}</span>
+                                        {% else %}
+                                        <span class="text-success">$0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        {% if item.estado == 'pagada' %}
+                                        <span class="badge bg-success rounded-pill">Pagada</span>
+                                        {% else %}
+                                        <span class="badge bg-warning rounded-pill">Pendiente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        {% if item.existe %}
+                                        <span class="badge bg-info rounded-pill"><i class="bi bi-arrow-repeat"></i> Actualizar</span>
+                                        {% else %}
+                                        <span class="badge bg-success rounded-pill"><i class="bi bi-plus"></i> Nueva</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="d-flex gap-3 mt-4 pt-3 border-top">
+                        <a href="{% url 'importar_sii' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>Cancelar
+                        </a>
+                        <form method="post" class="flex-grow-1">
+                            {% csrf_token %}
+                            <input type="hidden" name="confirmar_importacion" value="1">
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="bi bi-check-circle me-2"></i>Confirmar Importación ({{ total_facturas }} facturas)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <!-- Guía paso a paso para obtener CSV del SII -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header border-0 py-3" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);">
+                    <h5 class="mb-0 text-white fw-semibold">
+                        <i class="bi bi-question-circle-fill me-2"></i>¿Cómo obtener el archivo del SII?
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Accordion con pasos -->
+                    <div class="accordion" id="guiaSII">
+                        <div class="accordion-item border-0 mb-2">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#paso1">
+                                    <span class="badge bg-primary me-3">Paso 1</span>
+                                    <strong>Ingresa al portal del SII</strong>
+                                </button>
+                            </h2>
+                            <div id="paso1" class="accordion-collapse collapse" data-bs-parent="#guiaSII">
+                                <div class="accordion-body">
+                                    <ol class="mb-0">
+                                        <li>Ve a <a href="https://www.sii.cl" target="_blank" class="text-primary fw-semibold">www.sii.cl</a></li>
+                                        <li>Haz clic en <strong>"Servicios Online"</strong></li>
+                                        <li>Selecciona <strong>"Factura Electrónica"</strong></li>
+                                        <li>Ingresa con tu <strong>RUT y Clave Tributaria</strong></li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item border-0 mb-2">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#paso2">
+                                    <span class="badge bg-success me-3">Paso 2</span>
+                                    <strong>Consulta tus documentos emitidos</strong>
+                                </button>
+                            </h2>
+                            <div id="paso2" class="accordion-collapse collapse" data-bs-parent="#guiaSII">
+                                <div class="accordion-body">
+                                    <ol class="mb-0">
+                                        <li>En el menú, selecciona <strong>"Consulta de Documentos"</strong></li>
+                                        <li>Elige <strong>"Documentos Emitidos"</strong></li>
+                                        <li>Selecciona el <strong>período</strong> que deseas exportar</li>
+                                        <li>Haz clic en <strong>"Consultar"</strong></li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item border-0 mb-2">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-light rounded" type="button" data-bs-toggle="collapse" data-bs-target="#paso3">
+                                    <span class="badge bg-warning text-dark me-3">Paso 3</span>
+                                    <strong>Exporta a Excel/CSV</strong>
+                                </button>
+                            </h2>
+                            <div id="paso3" class="accordion-collapse collapse" data-bs-parent="#guiaSII">
+                                <div class="accordion-body">
+                                    <ol class="mb-3">
+                                        <li>Busca el botón <strong>"Exportar"</strong> o <strong>"Descargar"</strong></li>
+                                        <li>Selecciona formato <strong>"Excel"</strong> o <strong>"CSV"</strong></li>
+                                        <li>Guarda el archivo en tu computador</li>
+                                    </ol>
+                                    <div class="alert alert-warning mb-0 py-2">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        <strong>Importante:</strong> Si descargaste Excel (.xlsx), ábrelo y guárdalo como CSV
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formato alternativo simple -->
+                    <div class="alert alert-success border-0 mt-4 mb-0">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-lightning-charge-fill fs-4 me-3 text-success"></i>
+                            <div>
+                                <strong>¿No tienes acceso al SII?</strong>
+                                <p class="mb-2 small">Puedes crear tu propio CSV con estas columnas mínimas:</p>
+                                <code class="d-block bg-dark text-light p-2 rounded small">
+                                    folio,fecha_emision,fecha_vencimiento,rut_receptor,razon_social_receptor,monto_total,monto_pendiente,estado_pago
+                                </code>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Formulario de importación -->
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Seleccionar Archivo CSV</h5>
+            <!-- Formulario de importación moderno -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-cloud-upload text-success me-2"></i>Cargar Archivo CSV
+                    </h5>
                 </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" id="uploadForm">
                         {% csrf_token %}
+
                         <div class="mb-4">
-                            <label for="csv_file" class="form-label">Archivo CSV del SII</label>
-                            <input type="file"
-                                   class="form-control form-control-lg"
-                                   id="csv_file"
-                                   name="csv_file"
-                                   accept=".csv"
-                                   required>
-                            <div class="form-text">
+                            <label for="csv_file" class="form-label fw-semibold">
+                                <i class="bi bi-file-earmark-spreadsheet text-success me-2"></i>Selecciona tu archivo
+                            </label>
+                            <div class="upload-area border border-2 border-dashed rounded-3 p-5 text-center position-relative"
+                                 style="border-color: #10b981 !important; background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%); transition: all 0.3s ease;">
+                                <i class="bi bi-cloud-arrow-up" style="font-size: 4rem; color: #10b981; opacity: 0.7;"></i>
+                                <h5 class="mt-3 mb-2">Arrastra tu archivo aquí</h5>
+                                <p class="text-muted mb-3">o haz clic para seleccionar</p>
+                                <input type="file"
+                                       class="form-control position-absolute top-0 start-0 w-100 h-100 opacity-0"
+                                       style="cursor: pointer;"
+                                       id="csv_file"
+                                       name="csv_file"
+                                       accept=".csv"
+                                       required>
+                                <button type="button" class="btn btn-success shadow-sm" onclick="document.getElementById('csv_file').click()">
+                                    <i class="bi bi-folder2-open me-2"></i>Seleccionar Archivo
+                                </button>
+                                <p class="text-muted mb-0 small mt-3" id="fileName">
+                                    <i class="bi bi-info-circle me-1"></i>Ningún archivo seleccionado
+                                </p>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="bi bi-check-circle text-success me-1"></i>
                                 Formatos aceptados: .csv (máximo 10 MB)
                             </div>
                         </div>
 
-                        <div class="alert alert-info">
-                            <i class="bi bi-lightbulb"></i>
-                            <strong>Nota:</strong> El sistema creará automáticamente los clientes que no existan
-                            utilizando el RUT como identificador único.
+                        <div class="alert alert-info border-0 shadow-sm d-flex align-items-center">
+                            <i class="bi bi-stars fs-4 me-3"></i>
+                            <div>
+                                <strong>Importación Inteligente:</strong> El sistema creará automáticamente los clientes que no existan
+                                utilizando el RUT como identificador único.
+                            </div>
                         </div>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-cloud-upload"></i> Importar Facturas
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm" id="submitBtn">
+                                <i class="bi bi-cloud-upload me-2"></i>Importar Facturas
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <!-- Columnas esperadas -->
-            <div class="card mt-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="bi bi-table"></i> Columnas Esperadas en el CSV</h5>
+            <!-- Columnas esperadas con diseño moderno -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-table text-primary me-2"></i>Columnas Esperadas en el CSV
+                    </h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-4">
                     <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
+                        <table class="table table-hover modern-table align-middle mb-0">
+                            <thead class="bg-light">
                                 <tr>
-                                    <th>Columna</th>
-                                    <th>Descripción</th>
-                                    <th>Requerida</th>
+                                    <th class="border-0 py-3">Columna</th>
+                                    <th class="border-0 py-3">Descripción</th>
+                                    <th class="border-0 py-3 text-center">Requerida</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><code>Número Documento</code> o <code>Folio</code></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">TipoDTE</code> o <code class="bg-light px-2 py-1 rounded">Tipo DTE</code></td>
+                                    <td>Tipo de documento tributario (33, 34, etc.)</td>
+                                    <td class="text-center"><span class="badge bg-warning rounded-pill">Opcional</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code class="bg-light px-2 py-1 rounded">Folio</code> o <code class="bg-light px-2 py-1 rounded">Número Documento</code></td>
                                     <td>Número único de la factura</td>
-                                    <td><span class="badge bg-danger">Sí</span></td>
+                                    <td class="text-center"><span class="badge bg-danger rounded-pill">Requerida</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>RUT Emisor</code></td>
-                                    <td>RUT del cliente que emitió la factura</td>
-                                    <td><span class="badge bg-danger">Sí</span></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">RUTReceptor</code> o <code class="bg-light px-2 py-1 rounded">RUT Emisor</code></td>
+                                    <td>RUT del cliente</td>
+                                    <td class="text-center"><span class="badge bg-danger rounded-pill">Requerida</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Razón Social</code> o <code>Nombre</code></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">RazonSocialReceptor</code> o <code class="bg-light px-2 py-1 rounded">Razón Social</code></td>
                                     <td>Nombre o razón social del cliente</td>
-                                    <td><span class="badge bg-danger">Sí</span></td>
+                                    <td class="text-center"><span class="badge bg-danger rounded-pill">Requerida</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Fecha Emisión</code></td>
-                                    <td>Fecha de emisión (formato: DD-MM-YYYY)</td>
-                                    <td><span class="badge bg-danger">Sí</span></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">FechaEmision</code> o <code class="bg-light px-2 py-1 rounded">Fecha Emisión</code></td>
+                                    <td>Fecha de emisión (DD-MM-YYYY o YYYY-MM-DD)</td>
+                                    <td class="text-center"><span class="badge bg-danger rounded-pill">Requerida</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Fecha Vencimiento</code></td>
-                                    <td>Fecha de vencimiento (formato: DD-MM-YYYY)</td>
-                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">FechaVencimiento</code> o <code class="bg-light px-2 py-1 rounded">Fecha Vencimiento</code></td>
+                                    <td>Fecha de vencimiento</td>
+                                    <td class="text-center"><span class="badge bg-warning rounded-pill">Opcional</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Monto Neto</code> o <code>Neto</code></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">MontoNeto</code> o <code class="bg-light px-2 py-1 rounded">Monto Neto</code></td>
                                     <td>Monto neto de la factura</td>
-                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                    <td class="text-center"><span class="badge bg-warning rounded-pill">Opcional</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Monto IVA</code> o <code>IVA</code></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">IVA</code> o <code class="bg-light px-2 py-1 rounded">Monto IVA</code></td>
                                     <td>Monto del IVA</td>
-                                    <td><span class="badge bg-warning">Opcional</span></td>
+                                    <td class="text-center"><span class="badge bg-warning rounded-pill">Opcional</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>Monto Total</code> o <code>Total</code></td>
+                                    <td><code class="bg-light px-2 py-1 rounded">MontoTotal</code> o <code class="bg-light px-2 py-1 rounded">Monto Total</code></td>
                                     <td>Monto total de la factura</td>
-                                    <td><span class="badge bg-danger">Sí</span></td>
+                                    <td class="text-center"><span class="badge bg-danger rounded-pill">Requerida</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code class="bg-light px-2 py-1 rounded">EstadoSII</code> o <code class="bg-light px-2 py-1 rounded">Estado SII</code></td>
+                                    <td>Estado del documento en el SII</td>
+                                    <td class="text-center"><span class="badge bg-warning rounded-pill">Opcional</span></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <div class="alert alert-secondary mb-0 mt-3">
-                        <small>
-                            <i class="bi bi-info-circle"></i>
-                            Si no se proporciona la fecha de vencimiento, se calculará automáticamente
-                            como 30 días después de la fecha de emisión.
-                        </small>
+                    <div class="alert alert-light border shadow-sm mb-0 mt-4">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-info-circle text-primary fs-4 me-3"></i>
+                            <div>
+                                <strong>Nota importante:</strong>
+                                <ul class="mb-0 mt-2 small">
+                                    <li>Si no se proporciona la fecha de vencimiento, se calculará automáticamente como 30 días después de la emisión</li>
+                                    <li>El sistema detecta automáticamente el delimitador (coma o punto y coma)</li>
+                                    <li>Soporta múltiples formatos de fecha y números</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+    // Mostrar nombre del archivo seleccionado
+    document.getElementById('csv_file').addEventListener('change', function(e) {
+        const fileName = e.target.files[0]?.name || 'Ningún archivo seleccionado';
+        document.getElementById('fileName').innerHTML = '<i class="bi bi-file-earmark-check text-success me-1"></i>' + fileName;
+
+        // Añadir efecto visual
+        const uploadArea = document.querySelector('.upload-area');
+        if (e.target.files.length > 0) {
+            uploadArea.style.borderColor = '#10b981';
+            uploadArea.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)';
+        }
+    });
+
+    // Efecto drag and drop
+    const uploadArea = document.querySelector('.upload-area');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.style.borderColor = '#06b6d4';
+            uploadArea.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(79, 70, 229, 0.15) 100%)';
+            uploadArea.style.transform = 'scale(1.02)';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.style.borderColor = '#10b981';
+            uploadArea.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)';
+            uploadArea.style.transform = 'scale(1)';
+        }, false);
+    });
+</script>
 {% endblock %}

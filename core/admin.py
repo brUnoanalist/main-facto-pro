@@ -20,11 +20,11 @@ class ClienteAdmin(admin.ModelAdmin):
 
 @admin.register(Factura)
 class FacturaAdmin(admin.ModelAdmin):
-    list_display = ['numero_factura', 'cliente', 'monto_total', 'moneda', 'estado', 'estado_cobranza_display',
-                    'estado_sii', 'fecha_emision', 'fecha_vencimiento', 'importado_sii', 'usuario']
+    list_display = ['numero_factura', 'cliente', 'monto_total', 'monto_pagado', 'monto_pendiente', 'porcentaje_pagado_display',
+                    'moneda', 'estado', 'estado_cobranza_display', 'fecha_emision', 'fecha_vencimiento', 'importado_sii', 'usuario']
     list_filter = ['estado', 'estado_cobranza', 'estado_sii', 'moneda', 'importado_sii', 'fecha_emision', 'tipo_dte']
     search_fields = ['numero_factura', 'cliente__nombre', 'cliente__rut', 'descripcion']
-    readonly_fields = ['fecha_creacion', 'dias_vencidos']
+    readonly_fields = ['fecha_creacion', 'dias_vencidos', 'porcentaje_pagado_display']
     date_hierarchy = 'fecha_emision'
 
     fieldsets = (
@@ -32,7 +32,7 @@ class FacturaAdmin(admin.ModelAdmin):
             'fields': ('numero_factura', 'cliente', 'descripcion')
         }),
         ('Montos', {
-            'fields': ('monto', 'monto_neto', 'monto_iva', 'monto_exento', 'monto_total', 'moneda')
+            'fields': ('monto', 'monto_neto', 'monto_iva', 'monto_exento', 'monto_total', 'monto_pagado', 'monto_pendiente', 'moneda')
         }),
         ('Fechas', {
             'fields': ('fecha_emision', 'fecha_vencimiento', 'fecha_pago', 'fecha_creacion')
@@ -60,6 +60,14 @@ class FacturaAdmin(admin.ModelAdmin):
             return obj.get_estado_cobranza_display()
         return '-'
     estado_cobranza_display.short_description = 'Estado Cobranza'
+
+    def porcentaje_pagado_display(self, obj):
+        """Muestra el porcentaje pagado de la factura"""
+        porcentaje = obj.porcentaje_pagado()
+        if porcentaje > 0:
+            return f'{porcentaje:.1f}%'
+        return '0%'
+    porcentaje_pagado_display.short_description = '% Pagado'
 
 
 @admin.register(ConfiguracionRecordatorio)

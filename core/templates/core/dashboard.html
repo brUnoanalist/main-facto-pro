@@ -25,6 +25,44 @@
         </div>
     </div>
 
+    <!-- Alertas Inteligentes -->
+    {% if alertas %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-semibold">
+                            <i class="bi bi-bell-fill text-warning"></i> Alertas de Atención
+                            <span class="badge bg-danger rounded-pill ms-2">{{ alertas|length }}</span>
+                        </h5>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#alertasCollapse" aria-expanded="true" aria-controls="alertasCollapse" id="alertasToggle">
+                            <i class="bi bi-chevron-up" id="alertasIcon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse show" id="alertasCollapse">
+                    <div class="card-body py-2">
+                        {% for alerta in alertas %}
+                        <div class="alert alert-{{ alerta.tipo }} d-flex align-items-center mb-2 py-2" role="alert" style="border-radius: 8px;">
+                            <i class="bi bi-{{ alerta.icono }} me-3 fs-5"></i>
+                            <div class="flex-grow-1">
+                                {{ alerta.mensaje }}
+                            </div>
+                            {% if alerta.accion %}
+                            <a href="{% url alerta.accion %}?filtro={{ alerta.filtro }}" class="btn btn-sm btn-{{ alerta.tipo }} ms-3">
+                                Ver <i class="bi bi-arrow-right"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Tarjetas de estadísticas modernas -->
     <div class="row g-3 mb-4">
         <div class="col-xl-2 col-md-4 col-sm-6">
@@ -142,14 +180,98 @@
         </div>
     </div>
 
+    <!-- Métricas de gestión de cobranza -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-white bg-opacity-25 text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-currency-dollar fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-white mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem; opacity: 0.9;">Total Pagado</p>
+                            <h4 class="mb-0 fw-bold text-white" style="font-size: 1.1rem;">{{ total_pagado|currency:"CLP" }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-white border-opacity-25">
+                        <span class="text-white small" style="font-size: 0.75rem; opacity: 0.9;">
+                            {% if facturas_pagadas > 0 %}{{ facturas_pagadas }} pagadas{% endif %}
+                            {% if facturas_pagadas > 0 and facturas_pago_parcial > 0 %} + {% endif %}
+                            {% if facturas_pago_parcial > 0 %}{{ facturas_pago_parcial }} parciales{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-white bg-opacity-25 text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-wallet2 fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-white mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem; opacity: 0.9;">Pagos Parciales</p>
+                            <h4 class="mb-0 fw-bold text-white" style="font-size: 1.1rem;">{{ facturas_pago_parcial }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-white border-opacity-25">
+                        <span class="text-white small" style="font-size: 0.75rem; opacity: 0.9;">{{ monto_pagos_parciales|currency:"CLP" }} recibidos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-white bg-opacity-25 text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-percent fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-white mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem; opacity: 0.9;">Tasa de Cobranza</p>
+                            {% widthratio total_pagado total_facturado 100 as tasa_cobranza %}
+                            <h4 class="mb-0 fw-bold text-white" style="font-size: 1.1rem;">{{ tasa_cobranza|default:"0" }}%</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-white border-opacity-25">
+                        <span class="text-white small" style="font-size: 0.75rem; opacity: 0.9;">Efectividad de cobro</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-white bg-opacity-25 text-white rounded-3 p-3 me-2" style="width: 48px; height: 48px;">
+                            <i class="bi bi-graph-up-arrow fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <p class="text-white mb-1 small text-uppercase fw-semibold" style="font-size: 0.7rem; opacity: 0.9;">Total Facturado</p>
+                            <h4 class="mb-0 fw-bold text-white" style="font-size: 1.1rem;">{{ total_facturado|currency:"CLP" }}</h4>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-top border-white border-opacity-25">
+                        <span class="text-white small" style="font-size: 0.75rem; opacity: 0.9;">{{ total_facturas }} facturas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Gráficos modernos en la parte superior -->
     <div class="row g-3 mb-4">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-0 py-3">
                     <h5 class="mb-0 fw-semibold">
-                        <i class="bi bi-graph-up text-primary"></i> Tendencia de Facturas
-                        <small class="text-muted fs-6 ms-2">Últimos 6 meses</small>
+                        <i class="bi bi-graph-up text-primary"></i> Tendencia de Facturación
+                        <small class="text-muted fs-6 ms-2">Últimos 12 meses</small>
                     </h5>
                 </div>
                 <div class="card-body">
@@ -212,34 +334,75 @@
         </div>
     </div>
 
-    <!-- Alertas y últimas facturas -->
-    {% if facturas_vencidas > 0 %}
-    <div class="row mb-3">
-        <div class="col">
-            <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
-                <div>
-                    <h6 class="mb-1 fw-bold">¡Atención Requerida!</h6>
-                    <p class="mb-0">Tienes <strong>{{ facturas_vencidas }}</strong> facturas vencidas que requieren seguimiento inmediato.</p>
+    <!-- Mapa de Vencimiento -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold">
+                        <i class="bi bi-calendar-range text-primary"></i> Mapa de Vencimiento
+                        <small class="text-muted ms-2">Antigüedad de cartera vencida</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- 0-30 días -->
+                        <div class="col-md-3">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                                <div class="card-body text-center">
+                                    <h6 class="text-warning fw-bold mb-2">0-30 días</h6>
+                                    <h3 class="mb-1 fw-bold" style="color: #92400e;">{{ vencidas_0_30 }}</h3>
+                                    <p class="mb-0 small" style="color: #92400e;">{{ monto_0_30|currency:"CLP" }}</p>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar bg-warning" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 31-60 días -->
+                        <div class="col-md-3">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);">
+                                <div class="card-body text-center">
+                                    <h6 class="fw-bold mb-2" style="color: #c2410c;">31-60 días</h6>
+                                    <h3 class="mb-1 fw-bold" style="color: #9a3412;">{{ vencidas_31_60 }}</h3>
+                                    <p class="mb-0 small" style="color: #9a3412;">{{ monto_31_60|currency:"CLP" }}</p>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar" style="width: 100%; background: #f97316;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 61-90 días -->
+                        <div class="col-md-3">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);">
+                                <div class="card-body text-center">
+                                    <h6 class="text-danger fw-bold mb-2">61-90 días</h6>
+                                    <h3 class="mb-1 fw-bold" style="color: #991b1b;">{{ vencidas_61_90 }}</h3>
+                                    <p class="mb-0 small" style="color: #991b1b;">{{ monto_61_90|currency:"CLP" }}</p>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar bg-danger" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- +90 días -->
+                        <div class="col-md-3">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #374151 0%, #1f2937 100%);">
+                                <div class="card-body text-center">
+                                    <h6 class="text-white fw-bold mb-2">+90 días</h6>
+                                    <h3 class="mb-1 fw-bold text-white">{{ vencidas_90_mas }}</h3>
+                                    <p class="mb-0 small text-white-50">{{ monto_90_mas|currency:"CLP" }}</p>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar bg-light" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
-
-    {% if facturas_proximas > 0 %}
-    <div class="row mb-3">
-        <div class="col">
-            <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-                <i class="bi bi-clock-history me-3 fs-4"></i>
-                <div>
-                    <h6 class="mb-1 fw-bold">Recordatorio</h6>
-                    <p class="mb-0"><strong>{{ facturas_proximas }}</strong> facturas próximas a vencer en los próximos 7 días.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Últimas facturas -->
     <div class="row">
@@ -262,7 +425,8 @@
                                 <tr>
                                     <th class="border-0 py-3">N° Factura</th>
                                     <th class="border-0 py-3">Cliente</th>
-                                    <th class="border-0 py-3">Monto</th>
+                                    <th class="border-0 py-3">Total</th>
+                                    <th class="border-0 py-3">Pendiente</th>
                                     <th class="border-0 py-3">Vencimiento</th>
                                     <th class="border-0 py-3">Estado</th>
                                     <th class="border-0 py-3 text-end">Acciones</th>
@@ -277,24 +441,48 @@
                                             <i class="bi bi-person-circle me-1"></i>{{ factura.cliente.nombre }}
                                         </a>
                                     </td>
-                                    <td class="align-middle"><strong>{{ factura.monto_formateado }}</strong></td>
+                                    <td class="align-middle">{{ factura.monto_formateado }}</td>
+                                    <td class="align-middle">
+                                        {% if factura.monto_pendiente > 0 %}
+                                            <strong class="text-danger">{{ factura.monto_pendiente|currency:"CLP" }}</strong>
+                                            {% if factura.tiene_pago_parcial %}
+                                                <div class="progress mt-1" style="height: 3px; width: 60px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" style="width: {% widthratio factura.monto_pagado factura.monto_total 100 %}%"></div>
+                                                </div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-success">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="align-middle">{{ factura.fecha_vencimiento|date:"d/m/Y" }}</td>
                                     <td class="align-middle">
-                                        {% if factura.estado == 'vencida' %}
-                                            <span class="badge bg-danger rounded-pill">
-                                                <i class="bi bi-x-circle me-1"></i>Vencida
+                                        {% if factura.estado == 'pagada' %}
+                                            <span class="badge bg-info rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Pagada
                                             </span>
-                                        {% elif factura.estado == 'pendiente' %}
+                                        {% elif factura.estado_cobranza == 'vigente' %}
+                                            <span class="badge bg-success rounded-pill">
+                                                <i class="bi bi-check-circle me-1"></i>Vigente
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'por_vencer' %}
                                             <span class="badge bg-warning rounded-pill">
-                                                <i class="bi bi-clock me-1"></i>Pendiente
+                                                <i class="bi bi-clock me-1"></i>Por Vencer
                                             </span>
-                                        {% elif factura.estado == 'impaga' %}
+                                        {% elif factura.estado_cobranza == 'vencida' %}
+                                            <span class="badge bg-danger rounded-pill">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Vencida
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'mora' %}
                                             <span class="badge bg-dark rounded-pill">
-                                                <i class="bi bi-x-octagon me-1"></i>Impaga
+                                                <i class="bi bi-hourglass-split me-1"></i>Mora
+                                            </span>
+                                        {% elif factura.estado_cobranza == 'incobrable' %}
+                                            <span class="badge bg-secondary rounded-pill">
+                                                <i class="bi bi-x-circle me-1"></i>Incobrable
                                             </span>
                                         {% else %}
-                                            <span class="badge bg-success rounded-pill">
-                                                <i class="bi bi-check-circle me-1"></i>Pagada
+                                            <span class="badge bg-primary rounded-pill">
+                                                <i class="bi bi-question me-1"></i>{{ factura.estado }}
                                             </span>
                                         {% endif %}
                                     </td>
@@ -332,6 +520,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -460,56 +649,82 @@
     });
 
     // Gráfico de tendencia por mes (Línea)
-    const ctxTendencia = document.getElementById('tendenciaChart').getContext('2d');
-    new Chart(ctxTendencia, {
-        type: 'line',
-        data: {
-            labels: {{ meses_labels|safe }},
-            datasets: [{
-                label: 'Facturas Emitidas',
-                data: {{ meses_data|safe }},
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                pointBackgroundColor: '#6366f1',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointHoverBackgroundColor: '#6366f1',
-                pointHoverBorderColor: '#fff',
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                        title: function(context) { return context[0].label; },
-                        label: function(context) { return 'Facturas: ' + context.parsed.y; }
+    const mesesLabels = {{ meses_labels|safe }};
+    const mesesData = {{ meses_data|safe }};
+
+    const tendenciaCanvas = document.getElementById('tendenciaChart');
+    if (tendenciaCanvas && mesesLabels.length > 0) {
+        const ctxTendencia = tendenciaCanvas.getContext('2d');
+        new Chart(ctxTendencia, {
+            type: 'line',
+            data: {
+                labels: mesesLabels,
+                datasets: [{
+                    label: 'Facturas Emitidas',
+                    data: mesesData,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#6366f1',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverBackgroundColor: '#6366f1',
+                    pointHoverBorderColor: '#fff',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            title: function(context) { return context[0].label; },
+                            label: function(context) { return 'Facturas: ' + context.parsed.y; }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, font: { size: 11 } },
+                        grid: { drawBorder: false }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, family: 'Segoe UI' } }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { stepSize: 1, font: { size: 11 } },
-                    grid: { drawBorder: false }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 11, family: 'Segoe UI' } }
-                }
             }
-        }
-    });
+        });
+    } else if (tendenciaCanvas) {
+        // Mostrar mensaje cuando no hay datos
+        const ctx = tendenciaCanvas.getContext('2d');
+        ctx.font = '14px Segoe UI';
+        ctx.fillStyle = '#94a3b8';
+        ctx.textAlign = 'center';
+        ctx.fillText('No hay facturas registradas', tendenciaCanvas.width / 2, tendenciaCanvas.height / 2);
+    }
+
+    // Toggle icono de alertas al colapsar/expandir
+    const alertasCollapse = document.getElementById('alertasCollapse');
+    const alertasIcon = document.getElementById('alertasIcon');
+    if (alertasCollapse && alertasIcon) {
+        alertasCollapse.addEventListener('hidden.bs.collapse', function () {
+            alertasIcon.classList.remove('bi-chevron-up');
+            alertasIcon.classList.add('bi-chevron-down');
+        });
+        alertasCollapse.addEventListener('shown.bs.collapse', function () {
+            alertasIcon.classList.remove('bi-chevron-down');
+            alertasIcon.classList.add('bi-chevron-up');
+        });
+    }
 </script>
-{% endblock %}
 {% endblock %}
