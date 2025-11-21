@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py runserver:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(python manage.py dbshell:*)",
+      "Bash(python:*)",
+      "Bash(del /f \"c:\\Users\\bruno\\OneDrive\\Escritorio\\Proyectos\\facto-pro\\core\\migrations\\0010_remove_importar_sii_activo.py\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

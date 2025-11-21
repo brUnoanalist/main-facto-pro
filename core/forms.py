@@ -1,5 +1,5 @@
 from django import forms
-from .models import Cliente, Factura, ConfiguracionRecordatorio
+from .models import Cliente, Factura, ConfiguracionRecordatorio, validar_rut_chileno
 
 class ClienteForm(forms.ModelForm):
     class Meta:
@@ -7,11 +7,20 @@ class ClienteForm(forms.ModelForm):
         fields = ['nombre', 'rut', 'email', 'telefono', 'notas']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre completo'}),
-            'rut': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'RUT o DNI'}),
+            'rut': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '12.345.678-9'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'correo@ejemplo.com'}),
             'telefono': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+56 9 1234 5678'}),
             'notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notas adicionales...'}),
         }
+        help_texts = {
+            'rut': 'Formato: 12.345.678-9 o 12345678-9'
+        }
+
+    def clean_rut(self):
+        rut = self.cleaned_data.get('rut')
+        if rut:
+            validar_rut_chileno(rut)
+        return rut
 
 
 class FacturaForm(forms.ModelForm):

@@ -5,170 +5,208 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row mb-4">
+    <!-- Header moderno -->
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="mb-0"><i class="bi bi-people"></i> Gestión de Clientes</h1>
-            <p class="text-muted">Administra tu cartera de clientes</p>
+            <h1 class="fw-bold mb-1" style="font-size: 2rem; color: #1e293b;">
+                <i class="bi bi-people-fill text-primary"></i> Gestión de Clientes
+            </h1>
+            <p class="text-muted mb-0">Administra tu cartera de clientes de forma eficiente</p>
         </div>
         <div class="col-auto">
-            <a href="{% url 'cliente_crear' %}" class="btn btn-primary">
-                <i class="bi bi-person-plus"></i> Nuevo Cliente
+            <a href="{% url 'cliente_crear' %}" class="btn btn-primary shadow-sm">
+                <i class="bi bi-person-plus-fill"></i> Nuevo Cliente
             </a>
+        </div>
+    </div>
+
+    <!-- Barra de búsqueda -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="get" class="d-flex gap-2">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="bi bi-search text-muted"></i>
+                            </span>
+                            <input type="text" name="q" class="form-control border-start-0"
+                                   placeholder="Buscar por nombre, RUT o email..."
+                                   value="{{ busqueda }}">
+                            {% if busqueda %}
+                            <a href="{% url 'clientes_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">Buscar</button>
+                        </div>
+                        <select name="orden" class="form-select" style="width: auto;" onchange="this.form.submit()">
+                            <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre A-Z</option>
+                            <option value="-nombre" {% if orden == '-nombre' %}selected{% endif %}>Nombre Z-A</option>
+                            <option value="-fecha_registro" {% if orden == '-fecha_registro' %}selected{% endif %}>Más recientes</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="bi bi-list-ul"></i> Lista de Clientes
-                        <span class="badge bg-primary ms-2">{{ clientes.count }}</span>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-semibold d-flex align-items-center">
+                        <i class="bi bi-person-lines-fill text-primary me-2"></i>
+                        Cartera de Clientes
+                        <span class="badge bg-primary rounded-pill ms-3">{% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ clientes|length }}{% endif %}</span>
                     </h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover mb-0 modern-table">
+                            <thead class="bg-light">
                                 <tr>
-                                    <th>Cliente</th>
-                                    <th>RUT/DNI</th>
-                                    <th>Email</th>
-                                    <th>Teléfono</th>
-                                    <th>Facturas Vencidas</th>
-                                    <th>Total Deuda</th>
-                                    <th>Registro</th>
-                                    <th>Acciones</th>
+                                    <th class="border-0 py-3">Cliente</th>
+                                    <th class="border-0 py-3">RUT/DNI</th>
+                                    <th class="border-0 py-3">Email</th>
+                                    <th class="border-0 py-3">Teléfono</th>
+                                    <th class="border-0 py-3 text-center">Facturas Vencidas</th>
+                                    <th class="border-0 py-3">Total Deuda</th>
+                                    <th class="border-0 py-3">Registro</th>
+                                    <th class="border-0 py-3 text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for cliente in clientes %}
                                 <tr>
-                                    <td>
+                                    <td class="align-middle">
                                         <div class="d-flex align-items-center">
-                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" 
-                                                 style="width: 40px; height: 40px; font-size: 1.2rem;">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                 style="width: 48px; height: 48px; background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%); color: white; font-weight: 700; font-size: 1.1rem; flex-shrink: 0;">
                                                 {{ cliente.nombre|slice:":1"|upper }}
                                             </div>
                                             <div>
-                                                <strong>{{ cliente.nombre }}</strong>
+                                                <strong class="d-block">{{ cliente.nombre }}</strong>
                                                 {% if cliente.notas %}
-                                                <br><small class="text-muted">{{ cliente.notas|truncatewords:8 }}</small>
+                                                <small class="text-muted d-block" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                    <i class="bi bi-chat-text"></i> {{ cliente.notas|truncatewords:5 }}
+                                                </small>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td class="align-middle">
                                         {% if cliente.rut %}
-                                            <span class="badge bg-info">{{ cliente.rut|formatear_rut }}</span>
+                                            <span class="badge bg-info bg-opacity-10 text-info rounded-pill">
+                                                <i class="bi bi-card-text me-1"></i>{{ cliente.rut }}
+                                            </span>
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <a href="mailto:{{ cliente.email }}">
-                                            <i class="bi bi-envelope"></i> {{ cliente.email }}
+                                    <td class="align-middle">
+                                        <a href="mailto:{{ cliente.email }}" class="text-decoration-none">
+                                            <i class="bi bi-envelope me-1"></i>{{ cliente.email }}
                                         </a>
                                     </td>
-                                    <td>
+                                    <td class="align-middle">
                                         {% if cliente.telefono %}
-                                            <i class="bi bi-telephone"></i> {{ cliente.telefono }}
+                                            <i class="bi bi-telephone text-success me-1"></i>{{ cliente.telefono }}
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="align-middle text-center">
                                         {% if cliente.facturas_vencidas > 0 %}
-                                            <span class="badge badge-vencida">
+                                            <span class="badge bg-danger rounded-pill px-3">
                                                 {{ cliente.facturas_vencidas }}
                                             </span>
                                         {% else %}
-                                            <span class="badge bg-secondary">0</span>
+                                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3">0</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="align-middle">
                                         {% if cliente.total_deuda > 0 %}
                                             <strong class="text-danger">{{ cliente.total_deuda|currency:"CLP" }}</strong>
                                         {% else %}
-                                            <span class="text-success">{{ 0|currency:"CLP" }}</span>
+                                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>Sin deuda</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="align-middle">
                                         <small class="text-muted">
-                                            {{ cliente.fecha_registro|date:"d/m/Y" }}
+                                            <i class="bi bi-calendar3 me-1"></i>{{ cliente.fecha_registro|date:"d/m/Y" }}
                                         </small>
                                     </td>
-                                    <td>
-                                        <a href="{% url 'cliente_detalle' cliente.pk %}" 
-                                           class="btn btn-sm btn-outline-info" 
+                                    <td class="align-middle text-end">
+                                        <a href="{% url 'cliente_detalle' cliente.pk %}"
+                                           class="btn btn-sm btn-primary shadow-sm"
                                            title="Ver detalle">
-                                            <i class="bi bi-eye"></i>
+                                            <i class="bi bi-eye"></i> Ver Detalle
                                         </a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="7" class="text-center py-5">
-                                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
-                                        <p class="text-muted mt-3 mb-0">No hay clientes registrados</p>
-                                        <a href="{% url 'cliente_crear' %}" class="btn btn-primary mt-3">
-                                            <i class="bi bi-person-plus"></i> Crear Primer Cliente
-                                        </a>
+                                    <td colspan="8" class="text-center py-5">
+                                        <div class="py-5">
+                                            <i class="bi bi-people fs-1 text-muted" style="opacity: 0.3;"></i>
+                                            <p class="text-muted mt-3 mb-0 fw-semibold">No hay clientes registrados</p>
+                                            <p class="text-muted small">Comienza agregando tu primer cliente</p>
+                                            <a href="{% url 'cliente_crear' %}" class="btn btn-primary mt-3 shadow-sm">
+                                                <i class="bi bi-person-plus-fill"></i> Crear Primer Cliente
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Resumen estadístico -->
-    {% if clientes %}
-    <div class="row mt-4">
-        <div class="col-md-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Clientes con Deuda</h6>
-                    <h3 class="mb-0">
-                        {% with deudores=clientes|length %}
-                        {% for c in clientes %}
-                            {% if c.total_deuda > 0 %}
-                                {{ forloop.counter }}
-                            {% endif %}
-                        {% endfor %}
-                        {% endwith %}
-                    </h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Total Clientes</h6>
-                    <h3 class="mb-0">{{ clientes.count }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h6 class="text-muted">Deuda Total</h6>
-                    <h3 class="mb-0 text-danger">
-                        {% with total=0 %}
-                            {% for c in clientes %}
-                                {% if forloop.first %}
-                                    {{ c.total_deuda|currency:"CLP" }}
-                                {% endif %}
-                            {% endfor %}
-                        {% endwith %}
-                    </h3>
+                    <!-- Paginación -->
+                    {% if page_obj.has_other_pages %}
+                    <div class="card-footer bg-white border-0 py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                Mostrando {{ page_obj.start_index }}-{{ page_obj.end_index }} de {{ page_obj.paginator.count }} clientes
+                            </small>
+                            <nav aria-label="Paginación">
+                                <ul class="pagination pagination-sm mb-0">
+                                    {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ busqueda }}&orden={{ orden }}">
+                                            <i class="bi bi-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+
+                                    {% for num in page_obj.paginator.page_range %}
+                                        {% if page_obj.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}&q={{ busqueda }}&orden={{ orden }}">{{ num }}</a>
+                                        </li>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ busqueda }}&orden={{ orden }}">
+                                            <i class="bi bi-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
