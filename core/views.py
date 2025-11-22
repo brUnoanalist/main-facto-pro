@@ -6,13 +6,10 @@ from django.contrib import messages
 from django.db.models import Q, Sum, Count, Case, When, F
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.http import HttpResponse
+from django.core.paginator import Paginator
 from .models import Cliente, Factura, ConfiguracionRecordatorio, HistorialRecordatorio
 from .forms import ClienteForm, FacturaForm, ConfiguracionForm
 from .utils import generar_pdf_reporte, generar_excel_reporte, enviar_recordatorio_email
-from .models import validar_rut_chileno, formatear_rut
-from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
 import datetime
 
 
@@ -60,10 +57,15 @@ def logout_view(request):
 @login_required
 def dashboard(request):
     clientes = Cliente.objects.filter(usuario=request.user, activo=True)
-    facturas = Factura.objects.filter(usuario=request.user)
 
-    # Actualizar estados de cobranza
-    actualizar_estados_cobranza(facturas)
+    # Actualizar estados de cobranza primero
+    facturas_pendientes = Factura.objects.filter(usuario=request.user, estado='pendiente')
+    for factura in facturas_pendientes:
+        factura.actualizar_estado_cobranza()
+        factura.save()
+
+    # Refrescar el QuerySet después de actualizar
+    facturas = Factura.objects.filter(usuario=request.user)
 
     # ========== SISTEMA DE ALERTAS INTELIGENTES ==========
     alertas = []
@@ -178,11 +180,12 @@ def dashboard(request):
     facturas_anuladas = facturas.filter(estado='anulada').count()
 
     # Contadores por estado de cobranza (solo pendientes)
-    facturas_vigentes = facturas.filter(estado='pendiente', estado_cobranza='vigente').count()
-    facturas_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').count()
-    facturas_vencidas = facturas.filter(estado='pendiente', estado_cobranza='vencida').count()
-    facturas_en_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').count()
-    facturas_incobrables = facturas.filter(estado='pendiente', estado_cobranza='incobrable').count()
+    # Forzar evaluación del QuerySet para obtener datos actualizados
+    facturas_vigentes = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='vigente').count()
+    facturas_por_vencer = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='por_vencer').count()
+    facturas_vencidas = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='vencida').count()
+    facturas_en_mora = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='mora').count()
+    facturas_incobrables = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='incobrable').count()
 
     # Facturas próximas a vencer (7 días o menos)
     facturas_proximas = facturas.filter(
@@ -218,45 +221,26 @@ def dashboard(request):
         monto_pagado__gt=0
     ).aggregate(total=Sum('monto_pagado'))['total'] or 0
 
-    # Montos por estado de cobranza para gráficos (usar monto_pendiente si existe)
-    monto_vigentes = facturas.filter(estado='pendiente', estado_cobranza='vigente').aggregate(
-        total=Sum(Case(
-            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+    # Montos por estado de cobranza para gráficos
+    # Usar monto_pendiente directamente ya que todas son facturas pendientes
+    monto_vigentes = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='vigente').aggregate(
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
-    monto_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').aggregate(
-        total=Sum(Case(
-            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+    monto_por_vencer = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='por_vencer').aggregate(
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
-    monto_vencidas = facturas.filter(estado='pendiente', estado_cobranza='vencida').aggregate(
-        total=Sum(Case(
-            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+    monto_vencidas = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='vencida').aggregate(
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
-    monto_en_mora = facturas.filter(estado='pendiente', estado_cobranza='mora').aggregate(
-        total=Sum(Case(
-            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+    monto_en_mora = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='mora').aggregate(
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
-    monto_incobrables = facturas.filter(estado='pendiente', estado_cobranza='incobrable').aggregate(
-        total=Sum(Case(
-            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
-            When(monto_total__gt=0, then=F('monto_total')),
-            default=F('monto')
-        ))
+    monto_incobrables = Factura.objects.filter(usuario=request.user, estado='pendiente', estado_cobranza='incobrable').aggregate(
+        total=Sum('monto_pendiente')
     )['total'] or 0
 
     monto_pagadas = facturas.filter(estado='pagada').aggregate(
@@ -356,11 +340,11 @@ def dashboard(request):
         'total_pagado': float(total_pagado),
         'total_facturado': float(total_facturado),
         # Montos por estado de cobranza
-        'monto_vigentes': float(monto_vigentes),
-        'monto_por_vencer': float(monto_por_vencer),
-        'monto_vencidas': float(monto_vencidas),
-        'monto_en_mora': float(monto_en_mora),
-        'monto_incobrables': float(monto_incobrables),
+        'monto_vigentes': int(monto_vigentes),
+        'monto_por_vencer': int(monto_por_vencer),
+        'monto_vencidas': int(monto_vencidas),
+        'monto_en_mora': int(monto_en_mora),
+        'monto_incobrables': int(monto_incobrables),
         'monto_pagadas': float(monto_pagadas),
         # Total pendiente (suma de todos los estados de cobranza)
         'total_pendiente': float(total_pendiente),
@@ -404,8 +388,50 @@ def clientes_list(request):
     if orden in ['nombre', '-nombre', 'rut', '-rut', '-fecha_registro']:
         clientes = clientes.order_by(orden)
 
+    # Calcular métricas para cada cliente
+    clientes_con_metricas = []
+    for cliente in clientes:
+        facturas_cliente = cliente.facturas.all()
+        facturas_vencidas = facturas_cliente.filter(
+            estado='pendiente',
+            estado_cobranza__in=['vencida', 'mora', 'incobrable']
+        ).count()
+        total_deuda = facturas_cliente.filter(estado='pendiente').aggregate(
+            total=Sum(Case(
+                When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+                default=F('monto_total')
+            ))
+        )['total'] or 0
+        total_facturas = facturas_cliente.count()
+        facturas_pagadas = facturas_cliente.filter(estado='pagada').count()
+
+        cliente.facturas_vencidas = facturas_vencidas
+        cliente.total_deuda = total_deuda
+        cliente.total_facturas = total_facturas
+        cliente.facturas_pagadas = facturas_pagadas
+        clientes_con_metricas.append(cliente)
+
+    # Dashboard de clientes
+    total_clientes = Cliente.objects.filter(usuario=request.user, activo=True).count()
+    clientes_con_deuda = 0
+    clientes_al_dia = 0
+    total_por_cobrar = 0
+
+    for c in Cliente.objects.filter(usuario=request.user, activo=True):
+        deuda = c.facturas.filter(estado='pendiente').aggregate(
+            total=Sum(Case(
+                When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+                default=F('monto_total')
+            ))
+        )['total'] or 0
+        if deuda > 0:
+            clientes_con_deuda += 1
+            total_por_cobrar += deuda
+        else:
+            clientes_al_dia += 1
+
     # Paginación
-    paginator = Paginator(clientes, 20)
+    paginator = Paginator(clientes_con_metricas, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -414,6 +440,10 @@ def clientes_list(request):
         'page_obj': page_obj,
         'busqueda': busqueda,
         'orden': orden,
+        'total_clientes': total_clientes,
+        'clientes_con_deuda': clientes_con_deuda,
+        'clientes_al_dia': clientes_al_dia,
+        'total_por_cobrar': total_por_cobrar,
     })
 
 @login_required
@@ -424,9 +454,81 @@ def cliente_detalle(request, pk):
     facturas = cliente.facturas.all()
     actualizar_estados_cobranza(facturas)
 
+    # Métricas del cliente
+    total_facturas = facturas.count()
+    facturas_pagadas = facturas.filter(estado='pagada').count()
+    facturas_pendientes = facturas.filter(estado='pendiente').count()
+    facturas_vencidas = facturas.filter(
+        estado='pendiente',
+        estado_cobranza__in=['vencida', 'mora', 'incobrable']
+    ).count()
+
+    # Montos
+    total_facturado = facturas.aggregate(
+        total=Sum(Case(
+            When(monto_total__gt=0, then=F('monto_total')),
+            default=F('monto')
+        ))
+    )['total'] or 0
+
+    total_pagado = facturas.filter(estado='pagada').aggregate(
+        total=Sum(Case(
+            When(monto_total__gt=0, then=F('monto_total')),
+            default=F('monto')
+        ))
+    )['total'] or 0
+
+    total_pendiente = facturas.filter(estado='pendiente').aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    # Por estado de cobranza
+    monto_vigente = facturas.filter(estado='pendiente', estado_cobranza='vigente').aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    monto_por_vencer = facturas.filter(estado='pendiente', estado_cobranza='por_vencer').aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    monto_vencido = facturas.filter(
+        estado='pendiente',
+        estado_cobranza__in=['vencida', 'mora', 'incobrable']
+    ).aggregate(
+        total=Sum(Case(
+            When(monto_pendiente__gt=0, then=F('monto_pendiente')),
+            default=F('monto_total')
+        ))
+    )['total'] or 0
+
+    # Tasa de pago
+    tasa_pago = 0
+    if total_facturado > 0:
+        tasa_pago = round((total_pagado / total_facturado) * 100)
+
     return render(request, 'core/cliente_detalle.html', {
         'cliente': cliente,
-        'facturas': facturas
+        'facturas': facturas,
+        'total_facturas': total_facturas,
+        'facturas_pagadas': facturas_pagadas,
+        'facturas_pendientes': facturas_pendientes,
+        'facturas_vencidas': facturas_vencidas,
+        'total_facturado': total_facturado,
+        'total_pagado': total_pagado,
+        'total_pendiente': total_pendiente,
+        'monto_vigente': monto_vigente,
+        'monto_por_vencer': monto_por_vencer,
+        'monto_vencido': monto_vencido,
+        'tasa_pago': tasa_pago,
     })
 
 @login_required

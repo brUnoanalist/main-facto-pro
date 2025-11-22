@@ -3,33 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistema de Morosidad{% endblock %}</title>
+    <title>{% block title %}Facto-Pro{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #4f46e5;
-            --secondary-color: #06b6d4;
-            --danger-color: #ef4444;
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --secondary-color: #0ea5e9;
+            --accent-color: #8b5cf6;
+            --danger-color: #f43f5e;
+            --danger-light: #fecdd3;
             --warning-color: #f59e0b;
+            --warning-light: #fef3c7;
             --success-color: #10b981;
-            --dark-color: #1e293b;
-            --light-bg: #f1f5f9;
+            --success-light: #d1fae5;
+            --dark-color: #0f172a;
+            --light-bg: #f8fafc;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 50%, #fae8ff 100%);
             background-attachment: fixed;
             min-height: 100vh;
+            color: var(--gray-800);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            color: var(--gray-900);
+            letter-spacing: -0.025em;
+        }
+
+        .fw-bold {
+            font-weight: 700 !important;
+        }
+
+        .fw-semibold {
+            font-weight: 600 !important;
+        }
+
+        .text-muted {
+            color: var(--gray-500) !important;
         }
 
         .navbar {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,.08);
-            padding: 0.5rem 0;
-            min-height: 60px;
+            background: linear-gradient(135deg, var(--dark-color) 0%, #1e293b 100%) !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,.15);
+            padding: 0.75rem 0;
+            min-height: 64px;
             backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
         .navbar-brand {
@@ -104,15 +147,59 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
             border: none;
             font-weight: 500;
             transition: all 0.3s ease;
+            letter-spacing: 0.01em;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.35);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--accent-color) 100%);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            border: none;
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            border: none;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            border: none;
+            color: var(--gray-900);
+        }
+
+        /* Badge improvements */
+        .badge.bg-success {
+            background-color: var(--success-light) !important;
+            color: #065f46 !important;
+        }
+
+        .badge.bg-danger {
+            background-color: var(--danger-light) !important;
+            color: #9f1239 !important;
+        }
+
+        .badge.bg-warning {
+            background-color: var(--warning-light) !important;
+            color: #92400e !important;
+        }
+
+        .badge.bg-info {
+            background-color: #dbeafe !important;
+            color: #1e40af !important;
+        }
+
+        .badge.bg-primary {
+            background-color: var(--primary-light) !important;
+            color: var(--primary-dark) !important;
         }
 
         .btn-outline-primary {

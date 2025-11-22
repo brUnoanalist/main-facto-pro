@@ -1,5 +1,6 @@
 from django import template
-from core.utils import formatear_moneda, formatear_rut
+from core.utils import formatear_moneda
+from core.models import formatear_rut
 
 register = template.Library()
 
