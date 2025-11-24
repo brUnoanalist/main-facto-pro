@@ -722,9 +722,10 @@ def exportar_excel(request):
 
 @login_required
 def importar_sii(request):
-    """Vista para importar facturas desde archivos CSV del SII"""
+    """Vista para importar facturas desde archivos CSV o XML del SII"""
     import csv
     import io
+    import xml.etree.ElementTree as ET
     from decimal import Decimal
     from datetime import datetime as dt
 
@@ -750,6 +751,77 @@ def importar_sii(request):
             except ValueError:
                 continue
         raise ValueError(f'Formato de fecha no reconocido: {date_str}')
+
+    def parse_xml_sii(xml_content):
+        """Parsea XML del SII (LibroCompraVenta) y extrae los detalles de facturas"""
+        # Namespace del SII
+        ns = {'sii': 'http://www.sii.cl/SiiDte'}
+
+        root = ET.fromstring(xml_content)
+
+        # Buscar elementos Detalle (con o sin namespace)
+        detalles = root.findall('.//sii:Detalle', ns)
+        if not detalles:
+            detalles = root.findall('.//Detalle')
+
+        facturas_data = []
+        notas_credito = []
+
+        for detalle in detalles:
+            # Función auxiliar para obtener texto de elemento
+            def get_text(tag):
+                elem = detalle.find(f'sii:{tag}', ns)
+                if elem is None:
+                    elem = detalle.find(tag)
+                return elem.text.strip() if elem is not None and elem.text else ''
+
+            tipo_doc = get_text('TpoDoc')
+            folio = get_text('FolioDoc')
+            fecha_doc = get_text('FchDoc')
+            rut_receptor = get_text('RUTRecep')
+            razon_social = get_text('RznSocRecep')
+            monto_neto = get_text('MntNeto')
+            monto_iva = get_text('MntIVA')
+            monto_total = get_text('MntTotal')
+
+            if not folio or not rut_receptor:
+                continue
+
+            # Nota de crédito - guardar para aplicar después
+            if tipo_doc == '61':
+                folio_ref = get_text('FolioDocRef')
+                monto_nc = monto_total.replace('.', '').replace(',', '').replace('-', '') if monto_total else '0'
+                notas_credito.append({
+                    'folio_ref': folio_ref,
+                    'monto': int(monto_nc) if monto_nc else 0,
+                })
+                continue
+
+            # Nota de débito - ignorar por ahora
+            if tipo_doc == '56':
+                continue
+
+            # Facturas (33, 34, etc.)
+            facturas_data.append({
+                'folio': folio,
+                'tipo_dte': tipo_doc,
+                'fecha_emision': fecha_doc,
+                'rut': rut_receptor,
+                'razon_social': razon_social or f'Cliente {rut_receptor}',
+                'monto_neto': monto_neto,
+                'monto_iva': monto_iva,
+                'monto_total': monto_total,
+                'nc_aplicadas': 0,
+            })
+
+        # Aplicar notas de crédito a las facturas referenciadas
+        for nc in notas_credito:
+            for factura in facturas_data:
+                if factura['folio'] == nc['folio_ref']:
+                    factura['nc_aplicadas'] += nc['monto']
+                    break
+
+        return facturas_data
 
     if request.method == 'POST':
         # Paso 2: Confirmar importación
@@ -822,164 +894,195 @@ def importar_sii(request):
             return redirect('facturas_list')
 
         # Paso 1: Subir archivo y mostrar vista previa
-        csv_file = request.FILES.get('csv_file')
+        uploaded_file = request.FILES.get('csv_file')
 
-        if not csv_file:
-            messages.error(request, 'Por favor, selecciona un archivo CSV')
+        if not uploaded_file:
+            messages.error(request, 'Por favor, selecciona un archivo CSV o XML')
             return redirect('importar_sii')
 
-        if not csv_file.name.endswith('.csv'):
-            messages.error(request, 'El archivo debe ser un CSV')
+        file_name = uploaded_file.name.lower()
+        if not file_name.endswith('.csv') and not file_name.endswith('.xml'):
+            messages.error(request, 'El archivo debe ser CSV o XML')
             return redirect('importar_sii')
 
         try:
-            # Decodificar el archivo CSV
-            decoded_file = csv_file.read().decode('utf-8-sig')
-            io_string = io.StringIO(decoded_file)
-
-            # Detectar el delimitador automáticamente
-            sample = io_string.read(1024)
-            io_string.seek(0)
-            delimiter = ';' if sample.count(';') > sample.count(',') else ','
-
-            csv_reader = csv.DictReader(io_string, delimiter=delimiter)
+            # Decodificar el archivo
+            decoded_file = uploaded_file.read().decode('utf-8-sig')
 
             preview_data = []
             errores = []
             total_monto = Decimal('0')
             total_pendiente = Decimal('0')
 
-            for row_num, row in enumerate(csv_reader, start=2):
-                try:
-                    # Leer datos directamente del CSV
-                    # Formato esperado: folio, tipo_dte, fecha_emision, fecha_vencimiento, rut_receptor, razon_social_receptor, monto_total, monto_pendiente, estado_pago
+            # Determinar si es XML o CSV
+            is_xml = file_name.endswith('.xml')
 
-                    numero_factura = row.get('folio', '').strip()
-                    tipo_dte_str = row.get('tipo_dte', '33').strip() or '33'
-                    fecha_emision_str = row.get('fecha_emision', '').strip()
-                    fecha_vencimiento_str = row.get('fecha_vencimiento', '').strip()
-                    rut_emisor = row.get('rut_receptor', '').strip()
-                    razon_social = row.get('razon_social_receptor', '').strip()
-                    monto_total_str = row.get('monto_total', '0').strip() or '0'
-                    monto_pendiente_str = row.get('monto_pendiente', '0').strip() or '0'
-                    estado_pago_str = row.get('estado_pago', '').strip()
+            if is_xml:
+                # Procesar XML del SII
+                xml_facturas = parse_xml_sii(decoded_file)
 
-                    # Para compatibilidad con otros formatos, también intentar variantes
-                    if not numero_factura:
-                        numero_factura = row.get('Folio', row.get('Número Documento', '')).strip()
-                    if not rut_emisor:
-                        rut_emisor = row.get('RUT Receptor', row.get('RUTReceptor', row.get('RUT Emisor', ''))).strip()
-                    if not razon_social:
-                        razon_social = row.get('Razón Social Receptor', row.get('RazonSocialReceptor', row.get('Razón Social', ''))).strip()
-                    if not fecha_emision_str:
-                        fecha_emision_str = row.get('Fecha Emisión', row.get('FechaEmision', row.get('Fecha', ''))).strip()
-                    if not monto_total_str or monto_total_str == '0':
-                        monto_total_str = row.get('Monto Total', row.get('MontoTotal', row.get('Total', '0'))).strip() or '0'
+                for row_num, item in enumerate(xml_facturas, start=1):
+                    try:
+                        numero_factura = item['folio']
+                        rut_emisor = item['rut']
+                        razon_social = item['razon_social']
+                        fecha_emision_str = item['fecha_emision']
+                        monto_total_str = item['monto_total'] or '0'
 
-                    # Validar datos mínimos requeridos
-                    if not numero_factura:
-                        errores.append(f'Fila {row_num}: Falta el folio de la factura')
-                        continue
-                    if not rut_emisor:
-                        errores.append(f'Fila {row_num}: Falta el RUT del receptor')
-                        continue
-                    if not razon_social:
-                        errores.append(f'Fila {row_num}: Falta la razón social del receptor')
-                        continue
-                    if not fecha_emision_str:
-                        errores.append(f'Fila {row_num}: Falta la fecha de emisión')
-                        continue
-
-                    # Establecer valores por defecto para campos opcionales
-                    monto_neto_str = '0'
-                    monto_iva_str = '0'
-
-                    monto_neto = parse_decimal(monto_neto_str)
-                    monto_iva = parse_decimal(monto_iva_str)
-                    monto_total = parse_decimal(monto_total_str)
-
-                    # Si no hay monto total, calcularlo
-                    if monto_total == 0:
-                        monto_total = monto_neto + monto_iva
-
-                    fecha_emision = parse_date(fecha_emision_str) if fecha_emision_str else timezone.now().date()
-
-                    if fecha_vencimiento_str:
-                        fecha_vencimiento = parse_date(fecha_vencimiento_str)
-                    else:
-                        # Si no hay fecha de vencimiento, usar 30 días después de la emisión
+                        monto_total = parse_decimal(monto_total_str)
+                        fecha_emision = parse_date(fecha_emision_str) if fecha_emision_str else timezone.now().date()
                         fecha_vencimiento = fecha_emision + datetime.timedelta(days=30)
 
-                    monto_pendiente = parse_decimal(monto_pendiente_str)
-                    # Calcular monto pagado
-                    monto_pagado = monto_total - monto_pendiente if monto_total > 0 else Decimal('0')
+                        # Aplicar notas de crédito al monto pendiente
+                        nc_aplicadas = Decimal(str(item.get('nc_aplicadas', 0)))
+                        monto_pendiente = monto_total - nc_aplicadas
+                        monto_pagado = nc_aplicadas
 
-                    # Determinar el estado de la factura basado en estado_pago o monto_pendiente
-                    estado_factura = 'pendiente'
-                    fecha_pago = None
-
-                    # Verificar estado de pago del CSV
-                    if estado_pago_str:
-                        estado_lower = estado_pago_str.strip().lower()
-
-                        # Pago Total - factura completamente pagada
-                        if 'pago total' in estado_lower or estado_lower == 'pagada' or estado_lower == 'pagado':
+                        # Si la NC cubre todo el monto, marcar como pagada
+                        if monto_pendiente <= 0:
                             estado_factura = 'pagada'
-                            fecha_pago = timezone.now().date()
-                        # Pago Parcial - factura pendiente con abono
-                        elif 'pago parcial' in estado_lower or 'parcial' in estado_lower:
-                            estado_factura = 'pendiente'
-                        # Impaga - factura sin pagos
-                        elif 'impaga' in estado_lower:
-                            estado_factura = 'pendiente'
-                        # Al día - factura vigente sin vencimiento
-                        elif 'al día' in estado_lower or 'al dia' in estado_lower:
-                            estado_factura = 'pendiente'
-                        # Por vencer - factura próxima a vencer
-                        elif 'por vencer' in estado_lower:
-                            estado_factura = 'pendiente'
-                        # Default: pendiente
+                            monto_pendiente = Decimal('0')
+                            monto_pagado = monto_total
                         else:
                             estado_factura = 'pendiente'
 
-                    # Si el monto pendiente es 0, está pagada
-                    if monto_pendiente == 0:
-                        estado_factura = 'pagada'
-                        fecha_pago = timezone.now().date() if not fecha_pago else fecha_pago
-                        monto_pagado = monto_total
+                        existe = Factura.objects.filter(
+                            numero_factura=numero_factura,
+                            usuario=request.user
+                        ).exists()
 
-                    # Verificar si ya existe la factura
-                    existe = Factura.objects.filter(
-                        numero_factura=numero_factura,
-                        usuario=request.user
-                    ).exists()
+                        preview_item = {
+                            'row_num': row_num,
+                            'folio': numero_factura,
+                            'rut': rut_emisor,
+                            'razon_social': razon_social,
+                            'fecha_emision': fecha_emision.strftime('%Y-%m-%d'),
+                            'fecha_vencimiento': fecha_vencimiento.strftime('%Y-%m-%d'),
+                            'monto_total': float(monto_total),
+                            'monto_pendiente': float(monto_pendiente),
+                            'monto_pagado': float(monto_pagado),
+                            'estado': estado_factura,
+                            'fecha_pago': None,
+                            'existe': existe,
+                            'valido': True
+                        }
+                        preview_data.append(preview_item)
+                        total_monto += monto_total
+                        total_pendiente += monto_pendiente
 
-                    # Agregar a la vista previa
-                    preview_item = {
-                        'row_num': row_num,
-                        'folio': numero_factura,
-                        'rut': rut_emisor,
-                        'razon_social': razon_social,
-                        'fecha_emision': fecha_emision.strftime('%Y-%m-%d'),
-                        'fecha_vencimiento': fecha_vencimiento.strftime('%Y-%m-%d') if fecha_vencimiento else '',
-                        'monto_total': float(monto_total),
-                        'monto_pendiente': float(monto_pendiente),
-                        'monto_pagado': float(monto_pagado),
-                        'estado': estado_factura,
-                        'fecha_pago': fecha_pago.strftime('%Y-%m-%d') if fecha_pago else None,
-                        'existe': existe,
-                        'valido': True
-                    }
-                    preview_data.append(preview_item)
-                    total_monto += monto_total
-                    total_pendiente += monto_pendiente
+                    except Exception as e:
+                        errores.append({
+                            'row_num': row_num,
+                            'error': str(e)
+                        })
+                        continue
+            else:
+                # Procesar CSV
+                io_string = io.StringIO(decoded_file)
 
-                except Exception as e:
-                    errores.append({
-                        'row_num': row_num,
-                        'error': str(e)
-                    })
-                    continue
+                # Detectar el delimitador automáticamente
+                sample = io_string.read(1024)
+                io_string.seek(0)
+                delimiter = ';' if sample.count(';') > sample.count(',') else ','
+
+                csv_reader = csv.DictReader(io_string, delimiter=delimiter)
+
+                for row_num, row in enumerate(csv_reader, start=2):
+                    try:
+                        # Leer datos directamente del CSV
+                        numero_factura = row.get('folio', '').strip()
+                        tipo_dte_str = row.get('tipo_dte', '33').strip() or '33'
+                        fecha_emision_str = row.get('fecha_emision', '').strip()
+                        fecha_vencimiento_str = row.get('fecha_vencimiento', '').strip()
+                        rut_emisor = row.get('rut_receptor', '').strip()
+                        razon_social = row.get('razon_social_receptor', '').strip()
+                        monto_total_str = row.get('monto_total', '0').strip() or '0'
+                        monto_pendiente_str = row.get('monto_pendiente', '0').strip() or '0'
+                        estado_pago_str = row.get('estado_pago', '').strip()
+
+                        # Para compatibilidad con otros formatos
+                        if not numero_factura:
+                            numero_factura = row.get('Folio', row.get('Número Documento', '')).strip()
+                        if not rut_emisor:
+                            rut_emisor = row.get('RUT Receptor', row.get('RUTReceptor', row.get('RUT Emisor', ''))).strip()
+                        if not razon_social:
+                            razon_social = row.get('Razón Social Receptor', row.get('RazonSocialReceptor', row.get('Razón Social', ''))).strip()
+                        if not fecha_emision_str:
+                            fecha_emision_str = row.get('Fecha Emisión', row.get('FechaEmision', row.get('Fecha', ''))).strip()
+                        if not monto_total_str or monto_total_str == '0':
+                            monto_total_str = row.get('Monto Total', row.get('MontoTotal', row.get('Total', '0'))).strip() or '0'
+
+                        # Validar datos mínimos requeridos
+                        if not numero_factura:
+                            errores.append(f'Fila {row_num}: Falta el folio de la factura')
+                            continue
+                        if not rut_emisor:
+                            errores.append(f'Fila {row_num}: Falta el RUT del receptor')
+                            continue
+                        if not razon_social:
+                            errores.append(f'Fila {row_num}: Falta la razón social del receptor')
+                            continue
+                        if not fecha_emision_str:
+                            errores.append(f'Fila {row_num}: Falta la fecha de emisión')
+                            continue
+
+                        monto_total = parse_decimal(monto_total_str)
+                        fecha_emision = parse_date(fecha_emision_str) if fecha_emision_str else timezone.now().date()
+
+                        if fecha_vencimiento_str:
+                            fecha_vencimiento = parse_date(fecha_vencimiento_str)
+                        else:
+                            fecha_vencimiento = fecha_emision + datetime.timedelta(days=30)
+
+                        monto_pendiente = parse_decimal(monto_pendiente_str)
+                        monto_pagado = monto_total - monto_pendiente if monto_total > 0 else Decimal('0')
+
+                        estado_factura = 'pendiente'
+                        fecha_pago = None
+
+                        if estado_pago_str:
+                            estado_lower = estado_pago_str.strip().lower()
+                            if 'pago total' in estado_lower or estado_lower == 'pagada' or estado_lower == 'pagado':
+                                estado_factura = 'pagada'
+                                fecha_pago = timezone.now().date()
+                            elif 'pago parcial' in estado_lower or 'parcial' in estado_lower:
+                                estado_factura = 'pendiente'
+
+                        if monto_pendiente == 0:
+                            estado_factura = 'pagada'
+                            fecha_pago = timezone.now().date() if not fecha_pago else fecha_pago
+                            monto_pagado = monto_total
+
+                        existe = Factura.objects.filter(
+                            numero_factura=numero_factura,
+                            usuario=request.user
+                        ).exists()
+
+                        preview_item = {
+                            'row_num': row_num,
+                            'folio': numero_factura,
+                            'rut': rut_emisor,
+                            'razon_social': razon_social,
+                            'fecha_emision': fecha_emision.strftime('%Y-%m-%d'),
+                            'fecha_vencimiento': fecha_vencimiento.strftime('%Y-%m-%d') if fecha_vencimiento else '',
+                            'monto_total': float(monto_total),
+                            'monto_pendiente': float(monto_pendiente),
+                            'monto_pagado': float(monto_pagado),
+                            'estado': estado_factura,
+                            'fecha_pago': fecha_pago.strftime('%Y-%m-%d') if fecha_pago else None,
+                            'existe': existe,
+                            'valido': True
+                        }
+                        preview_data.append(preview_item)
+                        total_monto += monto_total
+                        total_pendiente += monto_pendiente
+
+                    except Exception as e:
+                        errores.append({
+                            'row_num': row_num,
+                            'error': str(e)
+                        })
+                        continue
 
             # Guardar datos en sesión para confirmar
             request.session['csv_preview_data'] = preview_data
